@@ -31,6 +31,10 @@ class Settings(BaseSettings):
       temporal de un usuario tras N contrasenas incorrectas seguidas.
     - `LEO_LOGIN_RATE_LIMIT_PER_MINUTE`: intentos de login por minuto, por IP
       y por usuario.
+    - `LEO_SERVICE_TOKEN_MINUTES`: vida del token de servicio (client
+      credentials), 10 por defecto y tope 60 (la BD lo exige).
+    - `LEO_SERVICE_TOKEN_RATE_LIMIT_PER_MINUTE`: emisiones de tokens de
+      servicio por minuto y por cliente (30 por defecto).
     """
 
     model_config = _ENV
@@ -45,6 +49,8 @@ class Settings(BaseSettings):
     leo_login_max_failed_attempts: int = Field(gt=0)
     leo_login_lock_minutes: int = Field(gt=0)
     leo_login_rate_limit_per_minute: int = Field(gt=0)
+    leo_service_token_minutes: int = Field(default=10, gt=0, le=60)
+    leo_service_token_rate_limit_per_minute: int = Field(default=30, gt=0)
 
 
 class SeedSettings(BaseSettings):

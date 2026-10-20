@@ -114,8 +114,24 @@ class RefreshTokenGrant(BaseModel):
     jkt: Jkt
 
 
+class ClientCredentialsGrant(BaseModel):
+    """Token de servicio (OAuth 2.0 client credentials, RFC 6749 4.4): la app
+    llamadora (la del HTTP Basic) pide acceso a la app `audience`. Sin `jkt`:
+    no hay navegador ni DPoP."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    grant_type: Literal["client_credentials"]
+    audience: str = Field(
+        min_length=1,
+        max_length=64,
+        description="Slug (= client_id) de la app destino que validará el token.",
+    )
+
+
 TokenRequest = Annotated[
-    AuthorizationCodeGrant | RefreshTokenGrant, Field(discriminator="grant_type")
+    AuthorizationCodeGrant | RefreshTokenGrant | ClientCredentialsGrant,
+    Field(discriminator="grant_type"),
 ]
 
 
@@ -128,13 +144,37 @@ class TokenResponse(BaseModel):
     session_id: UUID
 
 
+class ServiceTokenResponse(BaseModel):
+    """Token de servicio. Sin refresh: al vencer se pide otro. Opaco; en Leo
+    solo queda su hash."""
+
+    access_token: str
+    token_type: Literal["Bearer"] = "Bearer"
+    expires_in: int = Field(description="Segundos de vida (<= 3600).")
+    audience: str = Field(description="Slug de la app que puede validarlo.")
+
+
 class TokenCheck(BaseModel):
-    """Cuerpo de `/introspect` y `/revoke` (client credentials)."""
+    """Cuerpo de `/revoke` (client credentials): el `jkt` es obligatorio."""
 
     model_config = ConfigDict(extra="forbid")
 
     token: OpaqueTokenStr
     jkt: Jkt
+
+
+class IntrospectRequest(BaseModel):
+    """Cuerpo de `/introspect`. `jkt` es obligatorio para tokens de usuario y
+    se omite para tokens de servicio (no están atados a un dispositivo)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    token: OpaqueTokenStr
+    jkt: Jkt | None = Field(
+        default=None,
+        description="Thumbprint DPoP del dispositivo; obligatorio para tokens de "
+        "usuario, ignorado en tokens de servicio.",
+    )
 
 
 class IntrospectUser(BaseModel):
@@ -146,8 +186,22 @@ class IntrospectUser(BaseModel):
     email: str
 
 
+class IntrospectClient(BaseModel):
+    client_id: str = Field(description="Slug de la app llamadora.")
+    name: str
+
+
 class IntrospectResponse(BaseModel):
+    """Token activo de usuario: `user`, `permissions` (en la app que pregunta),
+    sesión, etc. Token activo de servicio (`principal_type = "service"`):
+    solo `client` (la app llamadora), `permissions` (tags de la app que
+    pregunta concedidos a la llamadora) y `exp`. Inactivo: `{"active": false}`."""
+
     active: bool
+    principal_type: Literal["user", "service"] | None = None
+    client: IntrospectClient | None = Field(
+        default=None, description="Solo tokens de servicio: la app llamadora."
+    )
     user: IntrospectUser | None = None
     permissions: list[str] | None = Field(
         default=None, description="Tags efectivos del usuario en ESTA app."

@@ -129,7 +129,16 @@ class ClientInfo:
 
 
 async def get_client_info(session: AsyncSession, client_id: str) -> ClientInfo | None:
-    app = await repository.get_by_client_id(session, client_id)
+    return _client_info(await repository.get_by_client_id(session, client_id))
+
+
+async def get_client_info_by_id(
+    session: AsyncSession, app_id: UUID
+) -> ClientInfo | None:
+    return _client_info(await session.get(Application, app_id, populate_existing=True))
+
+
+def _client_info(app: Application | None) -> ClientInfo | None:
     if app is None:
         return None
     return ClientInfo(

@@ -20,7 +20,7 @@ from app.core.db.seeds.catalog import (
 from app.core.security.passwords import hash_password
 from app.core.tests.dpop_keys import DpopKey
 from app.modules.applications.models import Action, Application, AppModule
-from app.modules.roles.models import Role, RoleAction
+from app.modules.roles.models import Role, RoleAction, ServiceGrant
 from app.modules.users.models import User, UserRole
 
 PUBLIC_URL = "https://leo.test"
@@ -174,6 +174,20 @@ async def make_role(
             )
         await session.flush()
     return role
+
+
+async def grant_service_access(
+    session: AsyncSession, caller: Application, role: Role
+) -> ServiceGrant:
+    """Concede a la app llamadora `caller` un rol de OTRA app (service_grants)."""
+    service_grant = ServiceGrant(
+        caller_application_id=caller.id,
+        role_id=role.id,
+        application_id=role.application_id,
+    )
+    session.add(service_grant)
+    await session.flush()
+    return service_grant
 
 
 def pkce_pair() -> tuple[str, str]:

@@ -271,6 +271,85 @@ async def test_semilla_agrega_acciones_nuevas_del_catalogo_sin_duplicar(
     assert assigned == 1
 
 
+# --- credenciales de servicio (acceso entre aplicaciones) ---
+
+GRANT_TAG = "leo.applications.grant-service-access"
+SERVICE_TOKEN_TAG = "leo.auth.service-token"
+
+
+async def test_semilla_agrega_las_acciones_de_servicio_sin_duplicar(
+    conn: AsyncConnection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Una BD sembrada con el catalogo anterior recibe las dos acciones de
+    credenciales de servicio, asignadas a `leo-admin`, sin duplicar."""
+    settings = _settings()
+    old_catalog = {
+        module: (
+            name,
+            {
+                v: d
+                for v, d in verbs.items()
+                if v not in ("grant-service-access", "service-token")
+            },
+        )
+        for module, (name, verbs) in LEO_MODULES.items()
+    }
+    monkeypatch.setattr("app.core.db.seeds.leo_app.LEO_MODULES", old_catalog)
+    await _seed(conn, settings)
+    tags = [GRANT_TAG, SERVICE_TOKEN_TAG]
+    count_sql = "SELECT count(*) FROM actions WHERE tag = ANY(:tags)"
+    assert await _scalar(conn, count_sql, tags=tags) == 0
+
+    monkeypatch.setattr("app.core.db.seeds.leo_app.LEO_MODULES", LEO_MODULES)
+    await _seed(conn, settings)
+    await _seed(conn, settings)
+
+    assert await _scalar(conn, count_sql, tags=tags) == 2
+    assigned = await _scalar(
+        conn,
+        "SELECT count(*) FROM role_actions ra JOIN actions ac ON ac.id = ra.action_id "
+        "JOIN roles r ON r.id = ra.role_id "
+        "WHERE ac.tag = ANY(:tags) AND r.slug = :role",
+        tags=tags,
+        role=LEO_ADMIN_ROLE_SLUG,
+    )
+    assert assigned == 2
+
+
+async def test_acciones_de_servicio_tienen_nombre_y_modulo_correctos(
+    conn: AsyncConnection,
+) -> None:
+    await _seed(conn, _settings())
+    rows = (
+        await conn.execute(
+            text(
+                "SELECT ac.tag, ac.name, m.slug, ac.description FROM actions ac "
+                "JOIN app_modules m ON m.id = ac.module_id WHERE ac.tag = ANY(:tags)"
+            ),
+            {"tags": [GRANT_TAG, SERVICE_TOKEN_TAG]},
+        )
+    ).all()
+    by_tag = {r.tag: r for r in rows}
+    assert by_tag[GRANT_TAG].name == "Conceder acceso entre aplicaciones"
+    assert by_tag[GRANT_TAG].slug == "applications"
+    assert not by_tag[GRANT_TAG].description.startswith("Evento:")
+    assert by_tag[SERVICE_TOKEN_TAG].name == "Evento: emisión de token de servicio"
+    assert by_tag[SERVICE_TOKEN_TAG].slug == "auth"
+    assert by_tag[SERVICE_TOKEN_TAG].description.startswith("Evento:")
+
+
+async def test_semilla_no_pisa_el_nombre_editado_de_una_accion_de_servicio(
+    conn: AsyncConnection,
+) -> None:
+    settings = _settings()
+    await _seed(conn, settings)
+    await conn.execute(
+        text("UPDATE actions SET name = 'Mi nombre' WHERE tag = :t"), {"t": GRANT_TAG}
+    )
+    await _seed(conn, settings)
+    assert (await _names(conn))[GRANT_TAG] == "Mi nombre"
+
+
 # --- nombres legibles de las acciones ---
 
 
@@ -291,8 +370,8 @@ async def test_toda_accion_leo_queda_con_su_nombre_del_catalogo(
     await _seed(conn, _settings())
     names = await _names(conn)
     assert names == LEO_ACTION_NAMES
-    assert len(names) == 28
-    assert len(set(names.values())) == 28
+    assert len(names) == 30
+    assert len(set(names.values())) == 30
 
 
 def test_catalogo_nombra_exactamente_las_acciones_de_leo() -> None:

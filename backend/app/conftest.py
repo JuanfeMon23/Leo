@@ -56,7 +56,7 @@ from app.core.db.seeds.leo_app import (
 )
 from app.core.dpop import replay_cache
 from app.main import app
-from app.modules.auth import login_limiters
+from app.modules.auth import login_limiters, service_token_limiter
 from app.modules.users.models import User
 from app.testkit import (
     FRONTEND_URL,
@@ -99,6 +99,7 @@ def _reset_process_state() -> None:
     """Limitadores del login y cache anti-replay son de proceso: cada test
     empieza limpio."""
     login_limiters().reset()
+    service_token_limiter().reset()
     replay_cache.clear()
 
 

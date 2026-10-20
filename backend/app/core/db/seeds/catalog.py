@@ -28,6 +28,8 @@ LEO_MODULES: dict[str, tuple[str, dict[str, str]]] = {
             "rotate-secret": "Regenerar el client_secret de una aplicacion",
             "sync-catalog": "Evento: una app sincroniza su catalogo de modulos y "
             "acciones",
+            "grant-service-access": "Conceder a una aplicacion roles de otra "
+            "aplicacion (acceso entre servicios)",
         },
     ),
     "users": (
@@ -64,6 +66,8 @@ LEO_MODULES: dict[str, tuple[str, dict[str, str]]] = {
             "revocadas)",
             "token": "Evento: emision o rotacion de tokens en /token",
             "authorize": "Evento: autorizacion de una app en /authorize",
+            "service-token": "Evento: emision de un token de servicio "
+            "(client credentials)",
         },
     ),
     "audit": (
@@ -85,6 +89,7 @@ LEO_ACTION_NAMES: dict[str, str] = {
     "leo.applications.deactivate": "Desactivar y reactivar aplicaciones",
     "leo.applications.rotate-secret": "Rotar el secreto de una aplicación",
     "leo.applications.sync-catalog": "Evento: sincronización de catálogo",
+    "leo.applications.grant-service-access": "Conceder acceso entre aplicaciones",
     "leo.users.view": "Consultar usuarios",
     "leo.users.create": "Crear usuarios",
     "leo.users.edit": "Editar usuarios",
@@ -105,6 +110,7 @@ LEO_ACTION_NAMES: dict[str, str] = {
     "leo.auth.refresh-reuse": "Evento: reutilización de token",
     "leo.auth.token": "Evento: emisión de tokens",
     "leo.auth.authorize": "Evento: autorización de acceso",
+    "leo.auth.service-token": "Evento: emisión de token de servicio",
     "leo.audit.view": "Consultar auditoría",
     "leo.audit.export": "Exportar auditoría",
 }
