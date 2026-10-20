@@ -1,0 +1,104 @@
+"""Modelos de datos del SDK (respuestas de Leo y usuario autenticado)."""
+
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
+
+class TokenSet(BaseModel):
+    access_token: str = Field(repr=False)
+    refresh_token: str = Field(repr=False)
+    token_type: str = "DPoP"
+    expires_in: int
+    refresh_expires_in: int
+    session_id: UUID
+
+
+class IntrospectUser(BaseModel):
+    id: UUID
+    username: str
+    name: str
+    email: str
+    # Opcionales: Leo aun puede no enviarlos (el SDK los usa cuando lleguen).
+    first_name: str | None = None
+    last_name: str | None = None
+
+
+class AppInfo(BaseModel):
+    """App a la que el usuario tiene acceso (selector de la barra superior)."""
+
+    slug: str
+    name: str
+    base_url: str
+
+
+class Introspection(BaseModel):
+    active: bool
+    user: IntrospectUser | None = None
+    permissions: list[str] = Field(default_factory=list)
+    session_id: UUID | None = None
+    client_id: str | None = None
+    exp: int | None = None
+    idle_timeout_seconds: int | None = None
+    applications: list[AppInfo] = Field(default_factory=list)
+    last_activity_at: datetime | None = None
+
+
+def _iso(moment: datetime) -> str:
+    return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+@dataclass(frozen=True)
+class LeoUser:
+    """Usuario autenticado en la peticion, con sus permisos EN ESTA app.
+
+    `access_token` y `jkt` se conservan para actuar en nombre del usuario
+    (auditoria); no aparecen en `repr` ni se serializan con `public()`.
+    """
+
+    id: UUID
+    username: str
+    name: str
+    email: str
+    permissions: frozenset[str]
+    session_id: UUID
+    access_token: str = field(repr=False, default="")
+    jkt: str = field(repr=False, default="")
+    first_name: str = ""
+    last_name: str = ""
+    applications: tuple[AppInfo, ...] = ()
+    expires_at: datetime | None = None
+    last_activity_at: datetime | None = None
+    idle_timeout_seconds: int | None = None
+
+    def can(self, tag: str) -> bool:
+        return tag in self.permissions
+
+    def public(self) -> dict:
+        """Forma segura para el navegador (nunca tokens)."""
+        return {
+            "id": str(self.id),
+            "username": self.username,
+            "name": self.name,
+            "first_name": self.first_name or self.name,
+            "last_name": self.last_name,
+            "email": self.email,
+            "permissions": sorted(self.permissions),
+            "session_id": str(self.session_id),
+        }
+
+    def me(self) -> dict:
+        """Cuerpo de `/auth/me` y `/auth/callback`: `{user, session, applications}`."""
+        return {
+            "user": self.public(),
+            "session": {
+                "expires_at": _iso(self.expires_at) if self.expires_at else None,
+                "last_activity_at": (
+                    _iso(self.last_activity_at) if self.last_activity_at else None
+                ),
+                "idle_timeout_seconds": self.idle_timeout_seconds,
+            },
+            "applications": [a.model_dump() for a in self.applications],
+        }
