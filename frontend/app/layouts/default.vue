@@ -5,6 +5,8 @@ import type { UiSidebarItem } from '#andromeda/components/ui/UiSidebar.vue'
 const canViewApplications = useCan('leo.applications.view')
 const canViewUsers = useCan('leo.users.view')
 const canViewRoles = useCan('leo.roles.view')
+const canViewAudit = useCan('leo.audit.view')
+const canViewSessions = useCan('leo.auth.view')
 const menu = computed<UiSidebarItem[]>(() => [
   ...(canViewApplications.value
     ? [{
@@ -28,6 +30,22 @@ const menu = computed<UiSidebarItem[]>(() => [
         to: '/roles',
         // Escudo (trazo, 24×24).
         icon: 'M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z'
+      }]
+    : []),
+  ...(canViewSessions.value
+    ? [{
+        label: 'Sesiones',
+        to: '/sessions',
+        // Monitor con base (trazo, 24×24).
+        icon: 'M4 5h16v11H4zM9 20h6M12 16v4'
+      }]
+    : []),
+  ...(canViewAudit.value
+    ? [{
+        label: 'Auditoría',
+        to: '/audit',
+        // Documento con líneas (trazo, 24×24).
+        icon: 'M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h5'
       }]
     : [])
 ])

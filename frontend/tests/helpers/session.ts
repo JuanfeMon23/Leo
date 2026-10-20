@@ -37,3 +37,13 @@ export const ALL_USERS_TAGS = [
   'leo.users.reset-password',
   'leo.users.assign-roles'
 ]
+
+export const ALL_AUDIT_TAGS = [
+  'leo.audit.view',
+  'leo.audit.export'
+]
+
+export const ALL_SESSIONS_TAGS = [
+  'leo.auth.view',
+  'leo.auth.revoke'
+]
