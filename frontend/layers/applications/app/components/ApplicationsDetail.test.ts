@@ -30,7 +30,7 @@ beforeEach(() => {
 afterEach(() => { document.body.innerHTML = '' })
 
 async function mountDetail(slug?: string) {
-  api.mockResolvedValue(detail(slug))
+  api.mockImplementation(async (url: string) => (url.endsWith('/service-access') ? [] : detail(slug)))
   const wrapper = await mountSuspended(ApplicationsDetail, { props: { id: 'a1' }, attachTo: document.body })
   await flushPromises()
   return wrapper

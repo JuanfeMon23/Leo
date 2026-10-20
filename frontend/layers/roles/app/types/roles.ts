@@ -93,6 +93,13 @@ export interface RolesCatalog {
   modules: RolesCatalogModule[]
 }
 
+/** App llamadora con acceso de servicio a un rol (`GET /roles/{id}/service-callers`). */
+export interface RolesServiceCaller {
+  id: string
+  application: { id: string, slug: string, name: string, is_active: boolean }
+  created_at: string
+}
+
 // --- editor de permisos ---
 
 /** Un permiso tal como lo muestra el editor. */

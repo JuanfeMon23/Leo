@@ -5,6 +5,7 @@ import type {
   RoleRead,
   RolesApplicationPage,
   RolesCatalog,
+  RolesServiceCaller,
   RoleUpdatePayload
 } from '../types/roles'
 import type { RolesQueryInput } from '../utils/roleQuery'
@@ -37,6 +38,9 @@ export function useRolesApi() {
     /** Quita una acción asignada; devuelve el rol con sus acciones. */
     removeAction: (id: string, actionId: string) =>
       api<RoleDetail>(`${role(id)}/actions/${actionId}`, { method: 'DELETE' }),
+
+    /** Aplicaciones con acceso de servicio a este rol (solo lectura). */
+    listServiceCallers: (id: string) => api<RolesServiceCaller[]>(`${role(id)}/service-callers`),
 
     listApplications: () =>
       api<RolesApplicationPage>('/applications', { query: { page: 1, page_size: APPLICATIONS_PAGE_SIZE } }),

@@ -18,7 +18,8 @@ export const ALL_APPLICATIONS_TAGS = [
   'leo.applications.create',
   'leo.applications.edit',
   'leo.applications.deactivate',
-  'leo.applications.rotate-secret'
+  'leo.applications.rotate-secret',
+  'leo.applications.grant-service-access'
 ]
 
 export const ALL_ROLES_TAGS = [

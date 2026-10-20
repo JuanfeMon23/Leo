@@ -103,6 +103,10 @@ const changeSummary = computed(() => {
         </LeoCan>
       </section>
 
+      <LeoCan tag="leo.applications.grant-service-access">
+        <RolesServiceCallers :role-id="role.id" />
+      </LeoCan>
+
       <LeoCan tag="leo.roles.edit">
         <RolesFormModal v-model:open="formOpen" :role="role" :applications="roleApplications" @saved="detail.refreshRole()" />
       </LeoCan>

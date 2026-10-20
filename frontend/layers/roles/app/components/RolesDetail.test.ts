@@ -165,4 +165,35 @@ describe('RolesDetail', () => {
     expect(wrapper.get('[data-testid="detail-error"]').text()).toContain('No se encontró el rol.')
     expect(byId('save-bar')).toBeNull()
   })
+
+  describe('aplicaciones con acceso de servicio', () => {
+    const callers = [{ id: 'c1', application: { id: 'app9', slug: 'incubus', name: 'Incubus', is_active: true }, created_at: '' }]
+
+    it('con el permiso: lista las apps con enlace a su detalle (solo lectura)', async () => {
+      signInWith([...ALL_ROLES_TAGS, 'leo.applications.grant-service-access'])
+      const wrapper = await mountDetail({ 'GET /roles/r1/service-callers': callers })
+      expect(api).toHaveBeenCalledWith('/roles/r1/service-callers')
+      const link = wrapper.get('[data-testid="caller-link"]')
+      expect(link.text()).toBe('Incubus')
+      expect(link.attributes('href')).toBe('/applications/app9')
+    })
+
+    it('sin apps: texto vacío', async () => {
+      signInWith([...ALL_ROLES_TAGS, 'leo.applications.grant-service-access'])
+      const wrapper = await mountDetail({ 'GET /roles/r1/service-callers': [] })
+      expect(wrapper.get('[data-testid="callers-empty"]').text()).toContain('Ninguna aplicación')
+    })
+
+    it('error: mensaje legible del backend', async () => {
+      signInWith([...ALL_ROLES_TAGS, 'leo.applications.grant-service-access'])
+      const wrapper = await mountDetail({ 'GET /roles/r1/service-callers': new LeoApiError(403, 'forbidden', 'No tienes acceso.') })
+      expect(wrapper.get('[data-testid="callers-error"]').text()).toContain('No tienes acceso.')
+    })
+
+    it('sin el permiso no se renderiza ni se consulta', async () => {
+      const wrapper = await mountDetail({})
+      expect(wrapper.find('[data-testid="service-callers"]').exists()).toBe(false)
+      expect(api).not.toHaveBeenCalledWith('/roles/r1/service-callers')
+    })
+  })
 })
