@@ -1,0 +1,215 @@
+"""Rutas `/api/v1/auth`.
+
+- Navegador (frontend de Leo, cookie SSO + header `DPoP`): `/login`,
+  `/activity`, `/me`, `/logout`, `/sessions`, `/sessions/{id}/revoke`,
+  `/authorize`.
+- Backend de las apps (client credentials por HTTP Basic, via `leo_sdk`):
+  `/token`, `/introspect`, `/revoke`.
+"""
+
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Query, Response, status
+
+from app.core.audit import Actor
+from app.core.authz import CurrentPrincipal, require_actor
+from app.core.client_auth import AuthenticatedClient
+from app.core.config import get_settings
+from app.core.database import SessionDep
+from app.core.pagination import PaginationDep
+from app.core.request_meta import Meta
+from app.core.schemas import AUTH_ERRORS, Page, error_responses
+from app.modules.auth import controller
+from app.modules.auth.dependencies import RequestDpop, session_cookie_name
+from app.modules.auth.schemas import (
+    AuthorizationCodeGrant,
+    AuthorizeRequest,
+    AuthorizeResponse,
+    IntrospectResponse,
+    LoginRequest,
+    MeResponse,
+    SessionRead,
+    TokenCheck,
+    TokenRequest,
+    TokenResponse,
+)
+
+router = APIRouter(tags=["auth"])
+
+NO_STORE = {"Cache-Control": "no-store", "Pragma": "no-cache"}
+
+
+def _set_session_cookie(response: Response, value: str, max_age: int) -> None:
+    response.set_cookie(
+        session_cookie_name(),
+        value,
+        max_age=max_age,
+        path="/",
+        secure=get_settings().leo_cookie_secure,
+        httponly=True,
+        samesite="strict",
+    )
+
+
+def _clear_session_cookie(response: Response) -> None:
+    response.delete_cookie(
+        session_cookie_name(),
+        path="/",
+        secure=get_settings().leo_cookie_secure,
+        httponly=True,
+        samesite="strict",
+    )
+
+
+@router.post(
+    "/login",
+    response_model=MeResponse,
+    responses=error_responses(401, 403, 422, 429),
+    summary="Iniciar sesión SSO (usuario o email + contraseña + header DPoP)",
+    description="Crea la sesión atada al jkt de la prueba DPoP y fija la cookie "
+    "HttpOnly `__Host-leo_session` (o `leo_session` sin HTTPS). El cuerpo nunca "
+    "lleva tokens.",
+)
+async def login(
+    session: SessionDep,
+    data: LoginRequest,
+    proof: RequestDpop,
+    meta: Meta,
+    response: Response,
+) -> MeResponse:
+    result = await controller.login(session, data.login, data.password, proof.jkt, meta)
+    _set_session_cookie(response, result.cookie_value, result.cookie_max_age)
+    response.headers.update(NO_STORE)
+    return result.me
+
+
+@router.post(
+    "/activity",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(401),
+    summary="Heartbeat de actividad (mouse/teclado) del frontend de Leo",
+)
+async def activity(_principal: CurrentPrincipal) -> Response:
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/me",
+    response_model=MeResponse,
+    responses=error_responses(401),
+    summary="Usuario, permisos leo.* y apps accesibles (selector de la barra)",
+)
+async def me(session: SessionDep, principal: CurrentPrincipal) -> MeResponse:
+    return await controller.me(session, principal)
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(401),
+    summary="Cerrar la sesión SSO (todas las apps)",
+)
+async def logout(
+    session: SessionDep, principal: CurrentPrincipal, meta: Meta
+) -> Response:
+    await controller.logout(session, principal, meta)
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    _clear_session_cookie(response)
+    return response
+
+
+@router.get(
+    "/sessions",
+    response_model=Page[SessionRead],
+    responses=error_responses(*AUTH_ERRORS),
+    summary="Sesiones propias o de un usuario (`user_id`)",
+)
+async def list_sessions(
+    session: SessionDep,
+    pagination: PaginationDep,
+    actor: Annotated[Actor, require_actor("leo.auth.view")],
+    principal: CurrentPrincipal,
+    user_id: Annotated[UUID | None, Query()] = None,
+    active_only: Annotated[bool, Query()] = True,
+) -> Page[SessionRead]:
+    return await controller.list_sessions(
+        session, principal, user_id, active_only, pagination
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/revoke",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(*AUTH_ERRORS, 404),
+)
+async def revoke_session(
+    session: SessionDep,
+    session_id: UUID,
+    actor: Annotated[Actor, require_actor("leo.auth.revoke")],
+) -> Response:
+    await controller.revoke_session_by_admin(session, session_id, actor)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/authorize",
+    response_model=AuthorizeResponse,
+    responses=error_responses(400, 401, 403, 422),
+    summary="Emitir un authorization code para una app (pantalla authorize)",
+)
+async def authorize(
+    session: SessionDep, data: AuthorizeRequest, principal: CurrentPrincipal, meta: Meta
+) -> AuthorizeResponse:
+    return AuthorizeResponse(
+        redirect_to=await controller.authorize(session, principal, data, meta)
+    )
+
+
+@router.post(
+    "/token",
+    response_model=TokenResponse,
+    responses=error_responses(400, 401, 422),
+    summary="Canjear code (PKCE) o rotar refresh (client credentials, HTTP Basic)",
+)
+async def token(
+    session: SessionDep,
+    data: TokenRequest,
+    client: AuthenticatedClient,
+    response: Response,
+) -> TokenResponse:
+    response.headers.update(NO_STORE)
+    if isinstance(data, AuthorizationCodeGrant):
+        return await controller.exchange_code(session, client, data)
+    return await controller.refresh(session, client, data)
+
+
+@router.post(
+    "/introspect",
+    response_model=IntrospectResponse,
+    response_model_exclude_none=True,
+    responses=error_responses(401, 422),
+    summary="Introspección de un access token (client credentials); desliza la "
+    "inactividad",
+)
+async def introspect(
+    session: SessionDep,
+    data: TokenCheck,
+    client: AuthenticatedClient,
+    response: Response,
+) -> IntrospectResponse:
+    response.headers.update(NO_STORE)
+    return await controller.introspect(session, client, data.token, data.jkt)
+
+
+@router.post(
+    "/revoke",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(401, 422),
+    summary="Logout único desde una app: revoca la sesión SSO del token",
+)
+async def revoke(
+    session: SessionDep, data: TokenCheck, client: AuthenticatedClient
+) -> Response:
+    await controller.revoke_from_client(session, client, data.token, data.jkt)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
