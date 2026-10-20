@@ -7,6 +7,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from uuid import NAMESPACE_URL, uuid5
 
 from leo_sdk.cache import TTLCache
 from leo_sdk.client import LeoClient
@@ -108,6 +109,50 @@ class SessionManager:
         )
         self._cache.set(key, _CachedUser(jkt, user, float(intro.exp or now + 1)))
         return user
+
+    async def service_for(
+        self, token: str, *, use_cache: bool = True
+    ) -> LeoUser | None:
+        """Principal de servicio del token Bearer, o None si no vale para ESTA
+        app. Misma cache que los usuarios (clave = SHA-256 del token, TTL 30 s o
+        menos si vence antes); nunca guarda tokens inactivos."""
+        key = sha256_hex(token)
+        now = self._wall()
+        if use_cache:
+            hit = self._cache.get(key)
+            if hit and hit.user.is_service and hit.exp > now:
+                return hit.user
+        try:
+            intro = await self.client.introspect_service(token)
+        except InvalidClientError as exc:
+            raise self._misconfigured(exc) from exc
+        except LeoError as exc:
+            if exc.status_code in (400, 422):  # no es un token de servicio
+                self._cache.delete(key)
+                return None
+            raise
+        if (
+            not intro.active
+            or intro.principal_type != "service"
+            or intro.client is None
+        ):
+            self._cache.delete(key)
+            return None
+        cid = intro.client.client_id
+        principal = LeoUser(
+            id=uuid5(NAMESPACE_URL, f"leo-service:{cid}"),
+            username=cid,
+            name=intro.client.name,
+            email="",
+            permissions=frozenset(intro.permissions),
+            session_id=None,
+            first_name=intro.client.name,
+            expires_at=(datetime.fromtimestamp(intro.exp, UTC) if intro.exp else None),
+            principal_type="service",
+            client_id=cid,
+        )
+        self._cache.set(key, _CachedUser("", principal, float(intro.exp or now + 1)))
+        return principal
 
     def forget(self, access_token: str | None) -> None:
         """Invalida la cache de ese token (logout)."""

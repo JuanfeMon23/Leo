@@ -10,7 +10,7 @@ from uuid import UUID
 import httpx
 
 from leo_sdk.errors import LeoUnavailableError, error_from_response
-from leo_sdk.models import Introspection, TokenSet
+from leo_sdk.models import Introspection, ServiceToken, TokenSet
 from leo_sdk.settings import LeoSettings
 
 
@@ -47,7 +47,12 @@ class LeoClient:
             payload = response.json()
         except ValueError:
             payload = None
-        raise error_from_response(response.status_code, payload)
+        retry_after = response.headers.get("retry-after", "")
+        raise error_from_response(
+            response.status_code,
+            payload,
+            retry_after=int(retry_after) if retry_after.isdigit() else None,
+        )
 
     async def exchange_code(
         self, code: str, code_verifier: str, redirect_uri: str, jkt: str
@@ -82,6 +87,24 @@ class LeoClient:
             "POST", "/auth/introspect", json={"token": token, "jkt": jkt}
         )
         return Introspection.model_validate(response.json())
+
+    async def introspect_service(self, token: str) -> Introspection:
+        """Introspecciona un token de servicio (sin `jkt`). Solo responde
+        `active` si ESTA app es la audiencia del token."""
+        response = await self._request(
+            "POST", "/auth/introspect", json={"token": token}
+        )
+        return Introspection.model_validate(response.json())
+
+    async def client_credentials(self, audience: str) -> ServiceToken:
+        """Canjea las credenciales de la app por un token de servicio hacia
+        `audience` (slug de la app destino)."""
+        response = await self._request(
+            "POST",
+            "/auth/token",
+            json={"grant_type": "client_credentials", "audience": audience},
+        )
+        return ServiceToken.model_validate(response.json())
 
     async def revoke(self, token: str, jkt: str) -> None:
         await self._request("POST", "/auth/revoke", json={"token": token, "jkt": jkt})

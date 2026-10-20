@@ -2,8 +2,11 @@
 router de login BFF (`leo_router`).
 
 Convenciones:
-- Toda peticion autenticada lleva la cookie de access + el header `DPoP` con la
+- Toda peticion de usuario lleva la cookie de access + el header `DPoP` con la
   prueba del navegador (se verifica aqui y su `jkt` se pasa a Leo).
+- Una app llamadora (servicio) lleva `Authorization: Bearer <token de
+  servicio>` (sin cookie ni DPoP): ver `leo_sdk.service`. Son caminos
+  distintos: un Bearer invalido nunca cae a la cookie.
 - Los errores salen como `{code, message, details}`; hay que llamar a
   `LeoAuth.install(app)` para registrar el handler.
 """
@@ -87,7 +90,9 @@ class LeoAuth:
             assert isinstance(exc, LeoError)
             response = JSONResponse(exc.body(), status_code=exc.status_code)
             if exc.status_code == 401:
-                response.headers["WWW-Authenticate"] = 'DPoP algs="ES256"'
+                response.headers["WWW-Authenticate"] = (
+                    exc.www_authenticate or 'DPoP algs="ES256"'
+                )
             if exc.clear_cookies:
                 self.clear_session_cookies(response)
             return response
@@ -159,6 +164,43 @@ class LeoAuth:
 
     # --- autenticacion de la peticion ---
 
+    @staticmethod
+    def _bearer(request: Request) -> str | None:
+        """Token del header `Authorization: Bearer`; None si la peticion no usa
+        ese esquema; "" si viene vacio."""
+        values = request.headers.getlist("authorization")
+        bearers = [v for v in values if v[:7].lower() == "bearer "]
+        if not bearers:
+            return None
+        if len(values) > 1:
+            return ""
+        return bearers[0][7:].strip()
+
+    async def _authenticate_service(
+        self, token: str, *, use_cache: bool = True
+    ) -> LeoUser:
+        principal = (
+            await self.sessions.service_for(token, use_cache=use_cache)
+            if token
+            else None
+        )
+        if principal is None:
+            raise LeoError(
+                "not_authenticated",
+                "Inicia sesión para continuar.",
+                401,
+                www_authenticate="Bearer",
+            )
+        return principal
+
+    def _reject_service(self, request: Request) -> None:
+        if self._bearer(request) is not None:
+            raise LeoError(
+                "user_required",
+                "Esta acción es solo para personas, no para aplicaciones.",
+                403,
+            )
+
     async def _authenticate(
         self, request: Request, response: Response, *, use_cache: bool
     ) -> LeoUser:
@@ -183,15 +225,29 @@ class LeoAuth:
         return user
 
     async def current_user(self, request: Request, response: Response) -> LeoUser:
-        """Dependencia FastAPI: usuario autenticado (cookie + DPoP), con
-        refresh transparente cuando el access expiro."""
+        """Dependencia FastAPI: principal autenticado. Con `Authorization:
+        Bearer` es un servicio (`user.principal_type == "service"`, sin DPoP);
+        si no, un usuario (cookie + DPoP, con refresh transparente cuando el
+        access expiro)."""
+        bearer = self._bearer(request)
+        if bearer is not None:
+            principal = await self._authenticate_service(bearer)
+            request.state.leo_user = principal
+            return principal
         user = await self._authenticate(request, response, use_cache=True)
         request.state.leo_user = user
         return user
 
+    async def current_person(self, request: Request, response: Response) -> LeoUser:
+        """Como `current_user` pero solo personas: un Bearer de servicio da 403
+        `user_required` (rutas de sesion o endpoints que no son para apps)."""
+        self._reject_service(request)
+        return await self.current_user(request, response)
+
     async def heartbeat_user(self, request: Request, response: Response) -> LeoUser:
         """Como `current_user` pero introspecciona SIN cache (desliza la
-        inactividad en Leo)."""
+        inactividad en Leo). Solo personas."""
+        self._reject_service(request)
         return await self._authenticate(request, response, use_cache=False)
 
     def require_action(self, tag: str) -> Any:
@@ -317,7 +373,7 @@ def leo_router(auth: LeoAuth, *, prefix: str = "/auth") -> APIRouter:
 
     @router.get("/me")
     async def me(
-        user: Annotated[LeoUser, Depends(auth.current_user)],
+        user: Annotated[LeoUser, Depends(auth.current_person)],
     ) -> dict[str, Any]:
         """`{user, session, applications}` (nunca tokens)."""
         return user.me()
@@ -332,6 +388,7 @@ def leo_router(auth: LeoAuth, *, prefix: str = "/auth") -> APIRouter:
     @router.post("/logout", status_code=204)
     async def logout(request: Request, response: Response) -> Response:
         """Revoca la sesion SSO (todas las apps) y borra las cookies."""
+        auth._reject_service(request)
         access = request.cookies.get(auth._cookie(s.access_cookie_name))
         refresh = request.cookies.get(auth._cookie(s.refresh_cookie_name))
         token = access or refresh

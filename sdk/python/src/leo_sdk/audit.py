@@ -130,7 +130,13 @@ class AuditClient:
         payload = {k: v for k, v in payload.items() if v is not None}
         await self.flush()
         fallback = dict(payload)
-        if actor is not None:
+        if actor is not None and actor.is_service:
+            # Leo aun no admite un actor de servicio en la ingesta: se omite el
+            # actor y la app llamadora queda en `reason`.
+            note = f"[servicio: {actor.client_id}]"
+            payload["reason"] = f"{note} {reason}" if reason else note
+            fallback = dict(payload)
+        elif actor is not None:
             payload["actor"] = {"access_token": actor.access_token, "jkt": actor.jkt}
             fallback["actor_user_id"] = str(actor.id)
         return await self._send(payload, fallback)

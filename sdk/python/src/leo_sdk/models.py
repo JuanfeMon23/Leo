@@ -34,8 +34,26 @@ class AppInfo(BaseModel):
     base_url: str
 
 
+class ServiceToken(BaseModel):
+    """Token de servicio (`client_credentials`): Bearer, sin refresh."""
+
+    access_token: str = Field(repr=False)
+    token_type: str = "Bearer"
+    expires_in: int
+    audience: str
+
+
+class ServiceClient(BaseModel):
+    """App llamadora de un token de servicio."""
+
+    client_id: str
+    name: str
+
+
 class Introspection(BaseModel):
     active: bool
+    principal_type: str | None = None  # "user" | "service" (None: Leo antiguo)
+    client: ServiceClient | None = None  # solo tokens de servicio
     user: IntrospectUser | None = None
     permissions: list[str] = Field(default_factory=list)
     session_id: UUID | None = None
@@ -63,7 +81,7 @@ class LeoUser:
     name: str
     email: str
     permissions: frozenset[str]
-    session_id: UUID
+    session_id: UUID | None
     access_token: str = field(repr=False, default="")
     jkt: str = field(repr=False, default="")
     first_name: str = ""
@@ -72,6 +90,15 @@ class LeoUser:
     expires_at: datetime | None = None
     last_activity_at: datetime | None = None
     idle_timeout_seconds: int | None = None
+    # "user" (cookie + DPoP) o "service" (Bearer de client_credentials). Un
+    # servicio no tiene sesion: `session_id` es None, `username` es su
+    # `client_id`, `id` es un UUID derivado del `client_id` y no hay `email`.
+    principal_type: str = "user"
+    client_id: str | None = None
+
+    @property
+    def is_service(self) -> bool:
+        return self.principal_type == "service"
 
     def can(self, tag: str) -> bool:
         return tag in self.permissions
@@ -86,7 +113,7 @@ class LeoUser:
             "last_name": self.last_name,
             "email": self.email,
             "permissions": sorted(self.permissions),
-            "session_id": str(self.session_id),
+            "session_id": (None if self.session_id is None else str(self.session_id)),
         }
 
     def me(self) -> dict:
