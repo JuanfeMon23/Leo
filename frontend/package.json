@@ -1,0 +1,30 @@
+{
+  "name": "leo-frontend",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev --port 3100",
+    "postinstall": "nuxt prepare",
+    "test": "vitest run -c vitest.unit.config.ts",
+    "test:components": "vitest run",
+    "typecheck": "nuxi typecheck"
+  },
+  "dependencies": {
+    "@vee-validate/zod": "^4.15.1",
+    "andromeda": "github:JuanfeMon23/Andromeda#v0.4.0",
+    "nuxt": "4.5.2",
+    "vee-validate": "^4.15.1",
+    "vue": "^3.5.43",
+    "vue-router": "^5.3.1",
+    "zod": "~3.25.76"
+  },
+  "devDependencies": {
+    "@nuxt/test-utils": "4.3.2",
+    "@vue/test-utils": "^2.5.1",
+    "happy-dom": "^20.14.5",
+    "typescript": "~5.9.0",
+    "vitest": "^5.0.3",
+    "vue-tsc": "^3.3.11"
+  }
+}
