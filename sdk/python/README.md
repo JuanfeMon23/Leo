@@ -48,6 +48,29 @@ llama a `/auth/callback?code=...&state=...`.
 en la introspección, el SDK usa `first_name = name`, `last_name = ""`, `applications = []` y la
 hora de la última introspección; cuando Leo los envía, los usa solo.
 
+## Llamar a otra app (credenciales de servicio)
+
+Requisito: un admin de Leo concede a tu app un rol de la app destino (`/applications/{id}/service-access`). El `client_id`/`client_secret` son los de tu app.
+
+```python
+provider = ServiceTokenProvider(LeoClient(LeoSettings()))
+http = httpx.AsyncClient(base_url="https://vladimir.example", auth=provider.auth("vladimir"))
+await http.get("/things")  # Bearer automatico; ante 401 renueva el token y reintenta una vez
+# o a mano: await provider.headers("vladimir") -> {"Authorization": "Bearer ..."}
+```
+
+El token se cachea en memoria hasta ~30 s antes de vencer (`margin_seconds`) con un solo canje concurrente por audiencia. Errores: `ServiceAccessDenied` (sin concesión), `InvalidTargetError` (audiencia inexistente), `TooManyAttemptsError` (`retry_after`), `InvalidClientError`, `LeoUnavailableError`.
+
+## Aceptar llamadas de otras apps
+
+`auth.current_user` y `auth.require_action(...)` aceptan además `Authorization: Bearer <token de servicio>` (sin cookie ni DPoP): el principal trae `principal_type == "service"`, `client_id` (la app llamadora), `permissions` y `session_id = None`. Un Bearer inválido da 401 `not_authenticated`; nunca cae a la cookie. Para endpoints solo de personas usa `Depends(auth.current_person)` (un servicio recibe 403 `user_required`); `/auth/me`, `/auth/activity` y `/auth/logout` ya lo exigen.
+
+```python
+@app.get("/things")
+async def things(p: Annotated[LeoUser, auth.require_action("miapp.things.view")]):
+    return {"caller": p.client_id if p.principal_type == "service" else p.username}
+```
+
 ## Desarrollo
 
 ```

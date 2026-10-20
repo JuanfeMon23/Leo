@@ -17,6 +17,7 @@ class LeoError(Exception):
         details: Any = None,
         *,
         clear_cookies: bool = False,
+        www_authenticate: str | None = None,
     ) -> None:
         super().__init__(message)
         self.code = code
@@ -25,6 +26,8 @@ class LeoError(Exception):
         self.details = details
         # El BFF borra las cookies de sesion al responder este error.
         self.clear_cookies = clear_cookies
+        # Valor de `WWW-Authenticate` de la respuesta 401 (opcional).
+        self.www_authenticate = www_authenticate
 
     def body(self) -> dict[str, Any]:
         return {"code": self.code, "message": self.message, "details": self.details}
@@ -41,6 +44,30 @@ class InvalidGrantError(LeoError):
     """400 `invalid_grant`: code/refresh invalido, usado, vencido o de otro jkt."""
 
 
+class InvalidTargetError(LeoError):
+    """400 `invalid_target`: la audiencia no existe o no esta activa."""
+
+
+class ServiceAccessDenied(LeoError):
+    """403 `access_denied`: la app no tiene concesion hacia esa audiencia."""
+
+
+class TooManyAttemptsError(LeoError):
+    """429 `too_many_attempts`; `retry_after` en segundos si Leo lo indica."""
+
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        status_code: int = 429,
+        details: Any = None,
+        *,
+        retry_after: int | None = None,
+    ) -> None:
+        super().__init__(code, message, status_code, details)
+        self.retry_after = retry_after
+
+
 class LeoUnavailableError(LeoError):
     """Leo no respondio o fallo (red, 5xx)."""
 
@@ -54,7 +81,9 @@ class LeoUnavailableError(LeoError):
         )
 
 
-def error_from_response(status_code: int, payload: Any) -> LeoError:
+def error_from_response(
+    status_code: int, payload: Any, *, retry_after: int | None = None
+) -> LeoError:
     """Traduce el cuerpo de error de Leo al tipo correspondiente."""
     data = payload if isinstance(payload, dict) else {}
     code = str(data.get("code") or "leo_error")
@@ -64,6 +93,14 @@ def error_from_response(status_code: int, payload: Any) -> LeoError:
         return LeoUnavailableError(message, details)
     if code == "invalid_client" and status_code == 401:
         return InvalidClientError(code, message, status_code, details)
+    if code == "invalid_target":
+        return InvalidTargetError(code, message, status_code, details)
+    if code == "access_denied" and status_code == 403:
+        return ServiceAccessDenied(code, message, status_code, details)
+    if code == "too_many_attempts" or status_code == 429:
+        return TooManyAttemptsError(
+            code, message, status_code, details, retry_after=retry_after
+        )
     if code == "invalid_grant":
         return InvalidGrantError(code, message, status_code, details)
     return LeoError(code, message, status_code, details)

@@ -13,11 +13,15 @@ from leo_sdk.dpop import (
 from leo_sdk.errors import (
     InvalidClientError,
     InvalidGrantError,
+    InvalidTargetError,
     LeoError,
     LeoUnavailableError,
+    ServiceAccessDenied,
+    TooManyAttemptsError,
 )
 from leo_sdk.fastapi import LeoAuth, leo_router
-from leo_sdk.models import Introspection, LeoUser, TokenSet
+from leo_sdk.models import Introspection, LeoUser, ServiceToken, TokenSet
+from leo_sdk.service import ServiceAuth, ServiceTokenProvider
 from leo_sdk.settings import LeoSettings
 from leo_sdk.tags import InvalidTagError, validate_tag
 
@@ -31,6 +35,7 @@ __all__ = [
     "InvalidClientError",
     "InvalidGrantError",
     "InvalidTagError",
+    "InvalidTargetError",
     "LeoAuth",
     "LeoClient",
     "LeoError",
@@ -38,7 +43,12 @@ __all__ = [
     "LeoUnavailableError",
     "LeoUser",
     "ReplayStore",
+    "ServiceAccessDenied",
+    "ServiceAuth",
+    "ServiceToken",
+    "ServiceTokenProvider",
     "TokenSet",
+    "TooManyAttemptsError",
     "check_dpop_proof",
     "diff",
     "leo_router",
