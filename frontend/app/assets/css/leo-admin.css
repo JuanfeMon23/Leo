@@ -1,0 +1,11 @@
+/*
+ * Utilidades de Tailwind para las layers de módulo (`layers/*`) y el núcleo del
+ * admin de Leo. Tailwind no detecta solo las clases de esas carpetas: aquí se
+ * toma el tema de Andromeda por referencia y se generan las utilidades que
+ * usan. Mismo patrón que `client/app/assets/css/leo-client.css`.
+ */
+@layer theme, base, components, utilities;
+@reference "#andromeda/assets/css/main.css";
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@source "../../";
+@source "../../../layers";
