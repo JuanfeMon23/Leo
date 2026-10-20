@@ -11,7 +11,7 @@
     "modules"
   ],
   "scripts": {
-    "postinstall": "nuxt prepare .playground",
+    "prepare:playground": "nuxt prepare .playground",
     "test": "vitest run -c vitest.unit.config.ts",
     "test:components": "vitest run",
     "typecheck": "nuxi typecheck .playground"
