@@ -1,0 +1,36 @@
+[project]
+name = "leo-backend"
+version = "0.1.0"
+description = "Leo: SSO, control de acceso y auditoria central (backend)"
+requires-python = ">=3.13"
+dependencies = [
+    "alembic>=1.20.0",
+    "argon2-cffi>=25.1.0",
+    "asyncpg>=0.32.0",
+    "cryptography>=50.0.2",
+    "fastapi>=0.148.0",
+    "pydantic-settings>=2.16.0",
+    "python-dotenv>=1.2.4",
+    "sqlalchemy[asyncio]>=2.0",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.17.1",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+
+[tool.ruff]
+line-length = 88
+extend-exclude = ["migrations"]
+
+[tool.ruff.lint]
+extend-select = ["I", "UP", "B"]
