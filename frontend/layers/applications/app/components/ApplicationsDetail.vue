@@ -208,6 +208,10 @@ const asApplication = computed<ApplicationRead | null>(() => detail.value)
         </UiCard>
       </section>
 
+      <LeoCan v-if="!readonly" tag="leo.applications.grant-service-access">
+        <ApplicationsServiceAccess :app-id="detail.id" :app-name="detail.name" />
+      </LeoCan>
+
       <LeoCan v-if="!readonly" :tag="['leo.applications.edit']">
         <ApplicationsFormModal v-model:open="appFormOpen" :application="asApplication" @updated="load" />
       </LeoCan>

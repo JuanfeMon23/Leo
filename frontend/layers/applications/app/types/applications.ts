@@ -74,3 +74,60 @@ export interface ApplicationSecretReveal {
   /** `created` o `rotated`: cambia el título/texto de la modal. */
   reason: 'created' | 'rotated'
 }
+
+// --- acceso entre aplicaciones (credenciales de servicio) ---
+// Fuente: backend/app/modules/roles/schemas.py (concesiones de `/applications/{id}/service-access`).
+
+export interface ApplicationsGrantPermission {
+  id: string
+  tag: string
+  verb: string
+  /** Nombre legible (lo principal); el tag es la referencia técnica. */
+  name: string
+  description: string | null
+  is_active: boolean
+  module: { id: string, slug: string, name: string }
+}
+
+export interface ApplicationsGrantRole {
+  id: string
+  slug: string
+  name: string
+  is_active: boolean
+}
+
+export interface ApplicationsGrantTarget {
+  id: string
+  slug: string
+  name: string
+}
+
+/** Una concesión: la app llamadora puede consultar `application` con los permisos de `role`. */
+export interface ApplicationsServiceGrant {
+  id: string
+  role: ApplicationsGrantRole
+  application: ApplicationsGrantTarget
+  permissions: ApplicationsGrantPermission[]
+  created_at: string
+}
+
+/** Concesiones agrupadas por aplicación destino. */
+export interface ApplicationsServiceGrantGroup {
+  application: ApplicationsGrantTarget
+  grants: ApplicationsServiceGrant[]
+}
+
+/** Rol ofrecido en el modal de conceder, con sus permisos (null = no se pudieron cargar). */
+export interface ApplicationsGrantableRole {
+  id: string
+  slug: string
+  name: string
+  description: string | null
+  permissions: ApplicationsGrantPermission[] | null
+}
+
+/** Página de roles (`GET /roles`) tal como la lee este módulo (solo lo que necesita). */
+export interface ApplicationsRolePage {
+  items: Array<{ id: string, slug: string, name: string, description: string | null, is_active: boolean }>
+  total: number
+}
