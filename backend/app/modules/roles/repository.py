@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.pagination import only_active, search
 from app.modules.applications.models import Action, Application, AppModule
-from app.modules.roles.models import Role, RoleAction
+from app.modules.roles.models import Role, RoleAction, ServiceGrant
 from app.modules.users.models import UserRole
 
 
@@ -135,3 +135,115 @@ async def roles_by_id(session: AsyncSession, role_ids: list[UUID]) -> dict[UUID,
         return {}
     rows = await session.scalars(select(Role).where(Role.id.in_(role_ids)))
     return {r.id: r for r in rows}
+
+
+# --- acceso entre servicios (service_grants) ---
+
+
+async def get_application(session: AsyncSession, app_id: UUID) -> Application | None:
+    return await session.get(Application, app_id, populate_existing=True)
+
+
+async def applications_by_id(
+    session: AsyncSession, app_ids: set[UUID]
+) -> dict[UUID, Application]:
+    if not app_ids:
+        return {}
+    rows = await session.scalars(select(Application).where(Application.id.in_(app_ids)))
+    return {a.id: a for a in rows}
+
+
+async def service_grants_of_caller(
+    session: AsyncSession, caller_id: UUID
+) -> list[tuple[ServiceGrant, Role, Application]]:
+    stmt = (
+        select(ServiceGrant, Role, Application)
+        .join(Role, Role.id == ServiceGrant.role_id)
+        .join(Application, Application.id == ServiceGrant.application_id)
+        .where(ServiceGrant.caller_application_id == caller_id)
+        .order_by(Application.slug, Role.slug)
+        .execution_options(populate_existing=True)
+    )
+    return [(g, r, a) for g, r, a in (await session.execute(stmt)).all()]
+
+
+async def actions_with_module_of_roles(
+    session: AsyncSession, role_ids: list[UUID]
+) -> list[tuple[UUID, Action, AppModule]]:
+    if not role_ids:
+        return []
+    stmt = (
+        select(RoleAction.role_id, Action, AppModule)
+        .join(Action, Action.id == RoleAction.action_id)
+        .join(AppModule, AppModule.id == Action.module_id)
+        .where(RoleAction.role_id.in_(role_ids))
+        .order_by(AppModule.slug, Action.name)
+    )
+    return [(rid, a, m) for rid, a, m in (await session.execute(stmt)).all()]
+
+
+async def remove_service_grant(
+    session: AsyncSession, caller_id: UUID, role_id: UUID
+) -> bool:
+    result = await session.execute(
+        delete(ServiceGrant).where(
+            ServiceGrant.caller_application_id == caller_id,
+            ServiceGrant.role_id == role_id,
+        )
+    )
+    return result.rowcount > 0
+
+
+async def service_callers_of_role(
+    session: AsyncSession, role_id: UUID
+) -> list[tuple[ServiceGrant, Application]]:
+    stmt = (
+        select(ServiceGrant, Application)
+        .join(Application, Application.id == ServiceGrant.caller_application_id)
+        .where(ServiceGrant.role_id == role_id)
+        .order_by(Application.slug)
+        .execution_options(populate_existing=True)
+    )
+    return [(g, a) for g, a in (await session.execute(stmt)).all()]
+
+
+def _active_granted_roles(caller_id: UUID, audience_id: UUID) -> Select:
+    """Roles activos de la audiencia concedidos a la llamadora."""
+    return (
+        select(ServiceGrant.role_id)
+        .join(Role, Role.id == ServiceGrant.role_id)
+        .where(
+            ServiceGrant.caller_application_id == caller_id,
+            ServiceGrant.application_id == audience_id,
+            Role.is_active,
+        )
+    )
+
+
+async def has_service_access(
+    session: AsyncSession, caller_id: UUID, audience_id: UUID
+) -> bool:
+    return bool(
+        await session.scalar(
+            select(exists(_active_granted_roles(caller_id, audience_id)))
+        )
+    )
+
+
+async def service_permissions(
+    session: AsyncSession, caller_id: UUID, audience_id: UUID
+) -> set[str]:
+    """Union de los tags activos (accion y modulo activos) de los roles
+    activos que la audiencia concedio a la llamadora."""
+    stmt = (
+        select(Action.tag)
+        .distinct()
+        .join(RoleAction, RoleAction.action_id == Action.id)
+        .join(AppModule, AppModule.id == Action.module_id)
+        .where(
+            RoleAction.role_id.in_(_active_granted_roles(caller_id, audience_id)),
+            Action.is_active,
+            AppModule.is_active,
+        )
+    )
+    return set((await session.scalars(stmt)).all())

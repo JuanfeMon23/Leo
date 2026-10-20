@@ -27,6 +27,8 @@ from app.core.db.types import str_enum
 
 # Vida maxima de un authorization code (Arquitectura, paso 3).
 AUTHORIZATION_CODE_TTL_SECONDS = 60
+# Vida maxima de un token de servicio (client credentials): 1 hora.
+SERVICE_TOKEN_MAX_TTL_SECONDS = 3600
 
 
 class SessionRevokedReason(enum.StrEnum):
@@ -123,6 +125,42 @@ class Token(UUIDv7PK, Timestamps, Base):
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     replaced_by_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("tokens.id"), index=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ServiceToken(UUIDv7PK, Timestamps, Base):
+    """Token de maquina (client credentials) de una app llamadora para la
+    audiencia `audience_application_id`. Opaco: solo su hash SHA-256 (hex).
+
+    Sin sesion, usuario ni `jkt`: la identidad es la app llamadora. Los
+    permisos salen de `service_grants` al introspeccionarlo. Vida maxima 1 h.
+    """
+
+    __tablename__ = "service_tokens"
+    __table_args__ = (
+        sha256_hex_check("token_hash"),
+        CheckConstraint("expires_at > created_at", name="expires_after_created"),
+        CheckConstraint(
+            f"expires_at <= created_at + interval '{SERVICE_TOKEN_MAX_TTL_SECONDS} seconds'",
+            name="ttl_max_1_hour",
+        ),
+        Index(
+            "ix_service_tokens_caller_audience",
+            "caller_application_id",
+            "audience_application_id",
+        ),
+    )
+
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    caller_application_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("applications.id"), nullable=False
+    )
+    audience_application_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("applications.id"), nullable=False, index=True
     )
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, index=True

@@ -10,6 +10,7 @@ from sqlalchemy.sql import func
 
 from app.modules.auth.models import (
     AuthorizationCode,
+    ServiceToken,
     Session,
     SessionRevokedReason,
     Token,
@@ -69,6 +70,55 @@ async def add_token(
 
 async def token_by_hash(session: AsyncSession, token_hash: str) -> Token | None:
     return await session.scalar(select(Token).where(Token.token_hash == token_hash))
+
+
+async def add_service_token(
+    session: AsyncSession,
+    *,
+    token_hash: str,
+    caller_application_id: UUID,
+    audience_application_id: UUID,
+    now: datetime,
+    expires_at: datetime,
+) -> ServiceToken:
+    """`created_at` se fija con el mismo reloj que `expires_at`: la restriccion
+    `expires_at <= created_at + 1 h` de la BD se evalua sobre ambos."""
+    token = ServiceToken(
+        token_hash=token_hash,
+        caller_application_id=caller_application_id,
+        audience_application_id=audience_application_id,
+        created_at=now,
+        expires_at=expires_at,
+    )
+    session.add(token)
+    await session.flush()
+    return token
+
+
+async def service_token_by_hash(
+    session: AsyncSession, token_hash: str
+) -> ServiceToken | None:
+    return await session.scalar(
+        select(ServiceToken)
+        .where(ServiceToken.token_hash == token_hash)
+        .execution_options(populate_existing=True)
+    )
+
+
+async def revoke_service_tokens(
+    session: AsyncSession, caller_id: UUID, audience_id: UUID, now: datetime
+) -> None:
+    """Revoca los tokens de servicio vigentes de la llamadora para la audiencia."""
+    await session.execute(
+        update(ServiceToken)
+        .where(
+            ServiceToken.caller_application_id == caller_id,
+            ServiceToken.audience_application_id == audience_id,
+            ServiceToken.revoked_at.is_(None),
+        )
+        .values(revoked_at=now)
+        .execution_options(synchronize_session="fetch")
+    )
 
 
 async def get_session(session: AsyncSession, session_id: UUID) -> Session | None:

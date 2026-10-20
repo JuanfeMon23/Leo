@@ -5,6 +5,9 @@
   `/authorize`.
 - Backend de las apps (client credentials por HTTP Basic, via `leo_sdk`):
   `/token`, `/introspect`, `/revoke`.
+- Servicio a servicio (client credentials, OAuth 2.0 4.4): `/token` con
+  `grant_type=client_credentials` emite un token de servicio y `/introspect`
+  (de la app audiencia) lo valida sin `jkt`.
 """
 
 from typing import Annotated
@@ -26,9 +29,12 @@ from app.modules.auth.schemas import (
     AuthorizationCodeGrant,
     AuthorizeRequest,
     AuthorizeResponse,
+    ClientCredentialsGrant,
+    IntrospectRequest,
     IntrospectResponse,
     LoginRequest,
     MeResponse,
+    ServiceTokenResponse,
     SessionRead,
     TokenCheck,
     TokenRequest,
@@ -168,19 +174,34 @@ async def authorize(
 
 @router.post(
     "/token",
-    response_model=TokenResponse,
-    responses=error_responses(400, 401, 422),
-    summary="Canjear code (PKCE) o rotar refresh (client credentials, HTTP Basic)",
+    response_model=TokenResponse | ServiceTokenResponse,
+    responses=error_responses(400, 401, 403, 422, 429),
+    summary="Canjear code (PKCE), rotar refresh o pedir un token de servicio "
+    "(client credentials, HTTP Basic)",
+    description="`grant_type`: `authorization_code` y `refresh_token` (usuarios, "
+    "atados al `jkt` DPoP del dispositivo) o `client_credentials` (servicio a "
+    "servicio): la app autenticada con Basic pide un token para la app "
+    "`audience`, que Leo concede solo si tiene >= 1 rol activo de ella "
+    "(`service_grants`).\n\n"
+    "**Decisión de seguridad (tokens de servicio):** no van atados a un "
+    "dispositivo (no hay navegador, así que no hay DPoP/`jkt`). Por eso viven "
+    "poco (`LEO_SERVICE_TOKEN_MINUTES`, 10 por defecto, tope 60), no tienen "
+    "refresh y en Leo solo se guarda su hash. Quien lo roba puede usarlo hasta "
+    "que vence: **en producción debe viajar por red privada**. Solo la app "
+    "`audience` puede validarlo (`/introspect`).",
 )
 async def token(
     session: SessionDep,
     data: TokenRequest,
     client: AuthenticatedClient,
     response: Response,
-) -> TokenResponse:
+    meta: Meta,
+) -> TokenResponse | ServiceTokenResponse:
     response.headers.update(NO_STORE)
     if isinstance(data, AuthorizationCodeGrant):
         return await controller.exchange_code(session, client, data)
+    if isinstance(data, ClientCredentialsGrant):
+        return await controller.issue_service_token(session, client, data, meta)
     return await controller.refresh(session, client, data)
 
 
@@ -191,10 +212,15 @@ async def token(
     responses=error_responses(401, 422),
     summary="Introspección de un access token (client credentials); desliza la "
     "inactividad",
+    description="Token de usuario: `jkt` obligatorio; responde usuario, permisos "
+    "y sesión (`principal_type: user`). Token de servicio: sin `jkt`; solo la "
+    "app audiencia del token lo valida y responde `principal_type: service`, "
+    "`client` (la llamadora), `permissions` y `exp`. Cualquier otro caso: "
+    '`{"active": false}`.',
 )
 async def introspect(
     session: SessionDep,
-    data: TokenCheck,
+    data: IntrospectRequest,
     client: AuthenticatedClient,
     response: Response,
 ) -> IntrospectResponse:

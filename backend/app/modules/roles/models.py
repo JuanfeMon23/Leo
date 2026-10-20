@@ -10,6 +10,7 @@ otra app no satisface ambas a la vez, asi que PostgreSQL la rechaza (SQLSTATE
 import uuid
 
 from sqlalchemy import (
+    CheckConstraint,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
@@ -69,6 +70,41 @@ class RoleAction(UUIDv7PK, Timestamps, Base):
 
     role_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     action_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    application_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False
+    )
+
+
+class ServiceGrant(UUIDv7PK, Timestamps, Base):
+    """Rol de OTRA app concedido a una app llamadora (credenciales de
+    servicio): los permisos que Leo le reconoce a la llamadora sobre la app
+    destino son las acciones de estos roles.
+
+    `application_id` es la app destino (= app del rol): la FK compuesta
+    `(role_id, application_id)` -> `roles(id, application_id)` impide conceder
+    un rol que no sea de la destino, como en `role_actions`. Una app no se
+    concede acceso a si misma. Revocar = borrar la fila (queda en auditoria).
+    """
+
+    __tablename__ = "service_grants"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["role_id", "application_id"],
+            ["roles.id", "roles.application_id"],
+            name="fk_service_grants_role_id_roles",
+        ),
+        UniqueConstraint("caller_application_id", "role_id"),
+        CheckConstraint(
+            "caller_application_id <> application_id",
+            name="caller_differs_from_target",
+        ),
+        Index("ix_service_grants_role_id", "role_id"),
+    )
+
+    caller_application_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("applications.id"), nullable=False
+    )
+    role_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     application_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), nullable=False
     )

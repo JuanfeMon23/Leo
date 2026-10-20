@@ -594,6 +594,7 @@ async def test_introspect_no_filtra_campos_sensibles(flow: Flow):
     info = await flow.introspect((await flow.tokens())["access_token"])
     assert set(info) == {
         "active",
+        "principal_type",
         "user",
         "permissions",
         "session_id",

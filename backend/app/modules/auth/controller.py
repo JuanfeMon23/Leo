@@ -18,6 +18,12 @@ Reglas de seguridad implementadas aqui:
   uno ya usado revoca la familia y la sesion (`refresh-reuse`).
 - Introspeccion: solo tokens de la app que pregunta y con su jkt; permisos
   calculados en vivo (desactivar usuario/app/rol/accion aplica de inmediato).
+- Tokens de servicio (client credentials): una app llamadora recibe un token
+  opaco para UNA app destino (audiencia) si Leo le concedio >= 1 rol activo
+  de ella. NO van atados a un dispositivo (no hay navegador, asi que no hay
+  DPoP/jkt): por eso viven poco (10 min por defecto, tope 1 h), sin refresh,
+  en la BD solo su hash, y en produccion deben viajar por red privada. Solo
+  la audiencia puede introspeccionarlos; los permisos se calculan en vivo.
 """
 
 from dataclasses import dataclass
@@ -28,7 +34,7 @@ from uuid import UUID, uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import clock
-from app.core.audit import Actor, AuditEntry
+from app.core.audit import Actor, AuditEntry, diff
 from app.core.authz import Principal
 from app.core.client_auth import ClientApp
 from app.core.config import get_settings
@@ -43,6 +49,7 @@ from app.core.exceptions import (
     ForbiddenError,
     TooManyRequestsError,
     UnauthorizedError,
+    ValidationAppError,
     not_found,
 )
 from app.core.pagination import Pagination, paginate
@@ -53,6 +60,7 @@ from app.modules import applications, audit, roles, users
 from app.modules.auth import repository
 from app.modules.auth.models import (
     AuthorizationCode,
+    ServiceToken,
     Session,
     SessionRevokedReason,
     Token,
@@ -61,6 +69,8 @@ from app.modules.auth.models import (
 from app.modules.auth.schemas import (
     AuthorizationCodeGrant,
     AuthorizeRequest,
+    ClientCredentialsGrant,
+    IntrospectClient,
     IntrospectResponse,
     IntrospectUser,
     MeApplication,
@@ -68,6 +78,7 @@ from app.modules.auth.schemas import (
     MeSession,
     MeUser,
     RefreshTokenGrant,
+    ServiceTokenResponse,
     SessionRead,
     TokenResponse,
 )
@@ -114,6 +125,19 @@ def login_limiters() -> LoginLimiters:
             ),
         )
     return _limiters
+
+
+_service_limiter: SlidingWindowLimiter | None = None
+
+
+def service_token_limiter() -> SlidingWindowLimiter:
+    """Emisiones de tokens de servicio por minuto y por cliente (en memoria)."""
+    global _service_limiter
+    if _service_limiter is None:
+        _service_limiter = SlidingWindowLimiter(
+            get_settings().leo_service_token_rate_limit_per_minute, 60
+        )
+    return _service_limiter
 
 
 # --- resultados ---
@@ -695,6 +719,114 @@ async def _reuse_detected(
     )
 
 
+# --- token de servicio (client credentials) ---
+
+SERVICE_TOKEN_MAX_MINUTES = 60
+
+
+async def _service_denied(
+    session: AsyncSession,
+    client: ClientApp,
+    meta: RequestMeta,
+    reason: str,
+    error: BadRequestError | ForbiddenError,
+) -> BadRequestError | ForbiddenError:
+    await audit.record_and_commit(
+        session,
+        AuditEntry(
+            action_tag="leo.auth.service-token",
+            result="denied",
+            entity_type="application",
+            entity_id=str(client.id),
+            reason=reason,
+            ip=meta.ip,
+            user_agent=meta.user_agent,
+            request_id=meta.request_id,
+        ),
+    )
+    return error
+
+
+async def issue_service_token(
+    session: AsyncSession,
+    client: ClientApp,
+    data: ClientCredentialsGrant,
+    meta: RequestMeta,
+) -> ServiceTokenResponse:
+    """Emite un token de servicio de `client` para la app `data.audience`.
+    Solo con >= 1 concesion (`service_grants`) hacia ella con rol activo."""
+    now = clock.now()
+    limiter = service_token_limiter()
+    key = str(client.id)
+    wait = limiter.retry_after(key, now)
+    if wait:
+        raise TooManyRequestsError(
+            "Demasiadas solicitudes de token de servicio. Intenta de nuevo más tarde.",
+            wait,
+        )
+    limiter.hit(key, now)
+
+    audience = await applications.get_client_info(session, data.audience)
+    if audience is None or not audience.is_active or audience.id == client.id:
+        raise await _service_denied(
+            session,
+            client,
+            meta,
+            f"Audiencia «{data.audience}» inexistente, desactivada o igual a la "
+            "llamadora.",
+            BadRequestError(
+                "La aplicación destino no existe, está desactivada o es la misma "
+                "que la que pide el token.",
+                {"audience": data.audience},
+                code="invalid_target",
+            ),
+        )
+    if not await roles.has_service_access(session, client.id, audience.id):
+        raise await _service_denied(
+            session,
+            client,
+            meta,
+            f"Sin acceso concedido a «{audience.slug}».",
+            ForbiddenError(
+                f"Esta aplicación no tiene acceso concedido a «{audience.name}». "
+                "Pide a un administrador de Leo que le conceda un rol de esa "
+                "aplicación.",
+                {"audience": audience.slug},
+                code="access_denied",
+            ),
+        )
+    minutes = min(get_settings().leo_service_token_minutes, SERVICE_TOKEN_MAX_MINUTES)
+    expires_at = now + timedelta(minutes=minutes)
+    token = new_opaque_token()
+    await repository.add_service_token(
+        session,
+        token_hash=token.hash,
+        caller_application_id=client.id,
+        audience_application_id=audience.id,
+        now=now,
+        expires_at=expires_at,
+    )
+    await audit.record_event(
+        session,
+        AuditEntry(
+            action_tag="leo.auth.service-token",
+            entity_type="application",
+            entity_id=str(client.id),
+            changes=diff(None, {"audience": audience.slug, "expires_at": expires_at}),
+            reason=f"Token de servicio de «{client.client_id}» para «{audience.slug}».",
+            ip=meta.ip,
+            user_agent=meta.user_agent,
+            request_id=meta.request_id,
+        ),
+    )
+    await session.commit()
+    return ServiceTokenResponse(
+        access_token=token.value,
+        expires_in=int((expires_at - now).total_seconds()),
+        audience=audience.slug,
+    )
+
+
 # --- introspeccion / revocacion (backend de la app) ---
 
 
@@ -743,8 +875,19 @@ async def resolve_access_token(
 
 
 async def introspect(
-    session: AsyncSession, client: ClientApp, token_value: str, jkt: str
+    session: AsyncSession, client: ClientApp, token_value: str, jkt: str | None
 ) -> IntrospectResponse:
+    """Token de servicio (solo lo valida su audiencia, sin jkt) o de usuario
+    (jkt obligatorio)."""
+    service = await repository.service_token_by_hash(session, sha256_hex(token_value))
+    if service is not None:
+        return await _introspect_service(session, client, service)
+    if jkt is None:
+        raise ValidationAppError(
+            "Faltan datos en la petición.",
+            [{"field": "jkt", "message": "Es obligatorio para tokens de usuario."}],
+            code="validation_error",
+        )
     owner = await resolve_access_token(session, client.id, token_value, jkt, touch=True)
     await session.commit()  # actividad deslizada o revocacion por inactividad
     if owner is None:
@@ -753,6 +896,7 @@ async def introspect(
     apps = await roles.accessible_applications(session, owner.user_id)
     return IntrospectResponse(
         active=True,
+        principal_type="user",
         user=IntrospectUser(
             id=owner.user_id,
             username=owner.username,
@@ -771,6 +915,45 @@ async def introspect(
         ],
         last_activity_at=owner.last_activity_at,
     )
+
+
+async def _introspect_service(
+    session: AsyncSession, client: ClientApp, token: ServiceToken
+) -> IntrospectResponse:
+    """`client` (la app que pregunta) debe ser la audiencia del token. Inactivo
+    si expiro, se revoco, alguna de las dos apps se desactivo, o la llamadora
+    ya no tiene roles activos de la audiencia. Permisos en vivo."""
+    inactive = IntrospectResponse(active=False)
+    now = clock.now()
+    if (
+        token.audience_application_id != client.id
+        or token.revoked_at is not None
+        or token.expires_at <= now
+    ):
+        return inactive
+    caller = await applications.get_client_info_by_id(
+        session, token.caller_application_id
+    )
+    if caller is None or not caller.is_active:
+        return inactive
+    if not await roles.has_service_access(session, caller.id, client.id):
+        return inactive
+    permissions = await roles.service_permissions(session, caller.id, client.id)
+    return IntrospectResponse(
+        active=True,
+        principal_type="service",
+        client=IntrospectClient(client_id=caller.client_id, name=caller.name),
+        permissions=sorted(permissions),
+        exp=int(token.expires_at.timestamp()),
+    )
+
+
+async def revoke_service_tokens(
+    session: AsyncSession, caller_id: UUID, audience_id: UUID, now: datetime
+) -> None:
+    """Revoca los tokens de servicio vigentes de la llamadora para esa
+    audiencia (al retirarle su ultima concesion). Sin commit."""
+    await repository.revoke_service_tokens(session, caller_id, audience_id, now)
 
 
 async def revoke_from_client(

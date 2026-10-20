@@ -140,6 +140,88 @@ async def make_session_0001(connection: AsyncConnection, user_id: UUID) -> UUID:
     )
 
 
+async def _public_tables(engine: AsyncEngine) -> set[str]:
+    return set((await _public_objects(engine))[0])
+
+
+async def test_0004_sube_y_baja_con_datos_reales(engine: AsyncEngine) -> None:
+    """`0004` solo agrega tablas: las filas existentes quedan intactas, el
+    downgrade quita `service_*` (con sus filas) y volver a subir las recrea."""
+    alembic("downgrade", "0003")
+    app_ids: list[UUID] = []
+    try:
+        assert not {"service_grants", "service_tokens"} & await _public_tables(engine)
+        async with engine.begin() as connection:
+            for _ in range(2):
+                app_ids.append(
+                    await insert(
+                        connection,
+                        "INSERT INTO applications (slug, name, base_url, "
+                        "client_id, client_secret_hash) VALUES (:s, 'A', "
+                        "'http://x', :s, :sha)",
+                        s=unique("app"),
+                        sha="a" * 64,
+                    )
+                )
+        alembic("upgrade", "head")
+        async with engine.begin() as connection:
+            role = await insert(
+                connection,
+                "INSERT INTO roles (application_id, slug, name) "
+                "VALUES (:a, 'r', 'Rol')",
+                a=app_ids[1],
+            )
+            await connection.execute(
+                text(
+                    "INSERT INTO service_grants (caller_application_id, role_id, "
+                    "application_id) VALUES (:c, :r, :t)"
+                ),
+                {"c": app_ids[0], "r": role, "t": app_ids[1]},
+            )
+            await connection.execute(
+                text(
+                    "INSERT INTO service_tokens (token_hash, "
+                    "caller_application_id, audience_application_id, expires_at) "
+                    "VALUES (:h, :c, :t, now() + interval '10 minutes')"
+                ),
+                {"h": "b" * 64, "c": app_ids[0], "t": app_ids[1]},
+            )
+        async with engine.connect() as connection:
+            kept = (
+                await connection.execute(
+                    text("SELECT count(*) FROM applications WHERE id = ANY(:a)"),
+                    {"a": app_ids},
+                )
+            ).scalar_one()
+        assert kept == 2
+
+        alembic("downgrade", "0003")
+        assert not {"service_grants", "service_tokens"} & await _public_tables(engine)
+        async with engine.connect() as connection:
+            kept = (
+                await connection.execute(
+                    text("SELECT count(*) FROM applications WHERE id = ANY(:a)"),
+                    {"a": app_ids},
+                )
+            ).scalar_one()
+        assert kept == 2
+    finally:
+        alembic("upgrade", "head")
+        async with engine.begin() as connection:
+            for table, column in (
+                ("service_tokens", "caller_application_id"),
+                ("service_grants", "caller_application_id"),
+                ("roles", "application_id"),
+                ("applications", "id"),
+            ):
+                await connection.execute(
+                    text(f"DELETE FROM {table} WHERE {column} = ANY(:a)"),
+                    {"a": app_ids},
+                )
+    assert {"service_grants", "service_tokens"} <= await _public_tables(engine)
+    assert await _schema_diff(engine) == []
+
+
 async def _action_columns(engine: AsyncEngine) -> set[str]:
     async with engine.connect() as connection:
         rows = await connection.execute(
