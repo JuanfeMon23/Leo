@@ -1,0 +1,13 @@
+/*
+ * Utilidades de Tailwind para los componentes de leo-client.
+ *
+ * La capa vive fuera del proyecto que la extiende (`../client` o
+ * node_modules), así que la detección automática de Tailwind no la ve. Aquí
+ * se toma el tema de Andromeda por referencia (sin repetir su CSS) y se
+ * generan solo las utilidades que usan los archivos de esta capa.
+ */
+/* Fija el orden de capas antes que cualquier otra declaración: esta hoja se carga antes que la de Andromeda y, sin esto, `utilities` quedaría por debajo de `base` (preflight) y se anularían paddings, bordes y fondos. */
+@layer theme, base, components, utilities;
+@reference "#andromeda/assets/css/main.css";
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@source "../../";

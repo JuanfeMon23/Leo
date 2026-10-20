@@ -1,0 +1,3 @@
+<template>
+  <LeoTopBar />
+</template>
