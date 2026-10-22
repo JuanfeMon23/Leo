@@ -45,7 +45,7 @@ const onSubmit = form.submit(async (v) => {
     </UiFormField>
     <UsersFormFields />
     <UiFormField name="password" label="Contraseña inicial" required>
-      <UiTextInput type="password" autocomplete="new-password" />
+      <UiPasswordInput autocomplete="new-password" />
     </UiFormField>
     <UiPasswordRequirements :password="values.password ?? ''" :username="values.username" :email="values.email" />
   </UiFormModal>

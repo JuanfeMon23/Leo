@@ -68,14 +68,14 @@ onBeforeUnmount(() => form.reset())
       <UiAlert v-if="form.formError.value" variant="danger" :message="form.formError.value" data-testid="password-error" />
 
       <UiFormField name="current_password" label="Contraseña actual" required>
-        <UiTextInput type="password" autocomplete="current-password" />
+        <UiPasswordInput autocomplete="current-password" />
       </UiFormField>
       <UiFormField name="new_password" label="Contraseña nueva" required>
-        <UiTextInput type="password" autocomplete="new-password" />
+        <UiPasswordInput autocomplete="new-password" />
       </UiFormField>
       <UiPasswordRequirements :password="values.new_password ?? ''" :username="user?.username" :email="user?.email" />
       <UiFormField name="confirm_password" label="Confirmar contraseña nueva" required>
-        <UiTextInput type="password" autocomplete="new-password" />
+        <UiPasswordInput autocomplete="new-password" />
       </UiFormField>
 
       <div>

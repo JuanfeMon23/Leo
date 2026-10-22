@@ -45,7 +45,7 @@ const onSubmit = form.submit(async (values) => {
         <UiTextInput placeholder="usuario o correo" autocomplete="username" />
       </UiFormField>
       <UiFormField name="password" label="Contraseña" required>
-        <UiTextInput type="password" autocomplete="current-password" />
+        <UiPasswordInput autocomplete="current-password" />
       </UiFormField>
 
       <UiButton type="submit" :loading="form.isSubmitting.value" class="w-full">
