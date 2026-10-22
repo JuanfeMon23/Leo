@@ -1,6 +1,6 @@
 {
   "name": "leo-client",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Capa Nuxt de Leo (sesión SSO, DPoP, permisos por tag, inactividad y barra superior) que extienden las apps del ecosistema.",
@@ -25,7 +25,7 @@
     "@nuxt/test-utils": "4.3.2",
     "@vee-validate/zod": "^4.15.1",
     "@vue/test-utils": "^2.5.1",
-    "andromeda": "github:JuanfeMon23/Andromeda#v0.4.0",
+    "andromeda": "github:JuanfeMon23/Andromeda#v0.5.0",
     "happy-dom": "^20.14.5",
     "nuxt": "4.5.2",
     "typescript": "~5.9.0",
