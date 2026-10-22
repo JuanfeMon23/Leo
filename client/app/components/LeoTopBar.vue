@@ -13,7 +13,7 @@ import type { LeoTransportKind } from '../lib/transport'
  * Muestra la app actual, el selector de aplicaciones (desplegable con las apps
  * a las que el usuario tiene acceso) y el menú de usuario (datos de solo
  * lectura, "Mi perfil" —en Leo `/profile`; en apps `bff`,
- * `<leoUrl>/profile?return=…`— y "Cerrar sesión" en rojo).
+ * `<url>/profile?return=…`— y "Cerrar sesión" en rojo).
  * Incluye el aviso de inactividad (`LeoIdleWarning`).
  */
 const props = withDefaults(defineProps<{
@@ -45,7 +45,7 @@ const loggingOut = ref(false)
 const currentUrl = ref('')
 
 const profileUrl = computed(() => buildProfileUrl(
-  { transport: config.transport as LeoTransportKind, leoUrl: config.leoUrl },
+  { transport: config.transport as LeoTransportKind, leoUrl: config.url },
   currentUrl.value
 ))
 
