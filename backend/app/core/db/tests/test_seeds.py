@@ -369,8 +369,8 @@ async def test_toda_accion_leo_queda_con_su_nombre_del_catalogo(
     await _seed(conn, _settings())
     names = await _names(conn)
     assert names == LEO_ACTION_NAMES
-    assert len(names) == 30
-    assert len(set(names.values())) == 30
+    assert len(names) == 31
+    assert len(set(names.values())) == 31
 
 
 def test_catalogo_nombra_exactamente_las_acciones_de_leo() -> None:

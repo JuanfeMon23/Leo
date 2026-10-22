@@ -17,6 +17,7 @@ from app.core.exceptions import ForbiddenError, ValidationAppError
 from app.core.pagination import Pagination, paginate
 from app.core.request_meta import RequestMeta
 from app.core.schemas import Page
+from app.core.service_authz import ServicePrincipal
 from app.modules import applications, auth, roles, users
 from app.modules.audit import repository
 from app.modules.audit.models import AuditEvent, AuditResult
@@ -107,6 +108,23 @@ async def record_denied(
     await record_and_commit(
         session,
         actor.entry(tag, result="denied", reason="No tiene el permiso requerido."),
+    )
+
+
+async def record_service_denied(
+    session: AsyncSession, principal: ServicePrincipal, tag: str, meta: RequestMeta
+) -> None:
+    """Hook de `require_service_actor` (configurado en `app/main.py`)."""
+    actor = Actor(None, principal.actor_name, None, meta)
+    await record_and_commit(
+        session,
+        actor.entry(
+            tag,
+            result="denied",
+            entity_type="application",
+            entity_id=str(principal.application_id),
+            reason="La aplicación no tiene el permiso de servicio requerido.",
+        ),
     )
 
 

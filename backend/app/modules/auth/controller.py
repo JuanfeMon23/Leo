@@ -56,6 +56,7 @@ from app.core.pagination import Pagination, paginate
 from app.core.rate_limit import SlidingWindowLimiter
 from app.core.request_meta import RequestMeta
 from app.core.schemas import Page
+from app.core.service_authz import ServicePrincipal
 from app.modules import applications, audit, roles, users
 from app.modules.auth import repository
 from app.modules.auth.models import (
@@ -1088,3 +1089,26 @@ async def revoke_from_client(
             ),
         )
     await session.commit()
+
+
+async def resolve_service_principal(
+    session: AsyncSession, token_value: str
+) -> ServicePrincipal | None:
+    """Hook de `core.service_authz`: dueno de un token de servicio vigente cuya
+    audiencia es la propia Leo, con la llamadora activa y con acceso concedido
+    (permisos en vivo). Si no, None. Sin commit."""
+    token = await repository.service_token_by_hash(session, sha256_hex(token_value))
+    if token is None or token.revoked_at is not None or token.expires_at <= clock.now():
+        return None
+    leo_id = await applications.leo_application_id(session)
+    if token.audience_application_id != leo_id:
+        return None
+    caller = await applications.get_client_info_by_id(
+        session, token.caller_application_id
+    )
+    if caller is None or not caller.is_active:
+        return None
+    permissions = await roles.service_permissions(session, caller.id, leo_id)
+    if not permissions:
+        return None
+    return ServicePrincipal(caller.id, caller.client_id, permissions)

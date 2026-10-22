@@ -43,6 +43,7 @@ _ERROR_DESCRIPTIONS: dict[int, str] = {
         "o regla de negocio incumplida (`weak_password`, `invalid_reference`...)."
     ),
     429: "Demasiados intentos (`too_many_attempts`). Lleva `Retry-After`.",
+    503: "Dependencia no disponible (`patient_role_unavailable`).",
 }
 
 
