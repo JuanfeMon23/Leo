@@ -35,9 +35,21 @@ class LoginRequest(BaseModel):
 class MeUser(BaseModel):
     id: UUID
     username: str
+    name: str = Field(description="Nombre completo (`first_name last_name`).")
     email: str
     first_name: str
     last_name: str
+
+
+class PasswordChange(BaseModel):
+    """`POST /auth/me/password`. La politica de la nueva contrasena la aplica
+    el controller (`password_weaknesses`), para devolver los requisitos
+    incumplidos en vez de un error de longitud suelto."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    current_password: str = Field(min_length=1, max_length=1024)
+    new_password: str = Field(min_length=1, max_length=1024)
 
 
 class MeSession(BaseModel):

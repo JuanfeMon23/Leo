@@ -178,14 +178,14 @@ async def revoke_family(session: AsyncSession, family_id: UUID, now: datetime) -
 
 
 async def active_session_ids_of_user(
-    session: AsyncSession, user_id: UUID
+    session: AsyncSession, user_id: UUID, except_id: UUID | None = None
 ) -> list[UUID]:
-    rows = await session.scalars(
-        select(Session.id).where(
-            Session.user_id == user_id, Session.revoked_at.is_(None)
-        )
+    stmt = select(Session.id).where(
+        Session.user_id == user_id, Session.revoked_at.is_(None)
     )
-    return list(rows)
+    if except_id is not None:
+        stmt = stmt.where(Session.id != except_id)
+    return list(await session.scalars(stmt))
 
 
 async def touch(session: AsyncSession, sso: Session, now: datetime) -> None:

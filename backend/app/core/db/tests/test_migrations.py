@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from app.core.db.registry import Base
 from app.core.db.triggers import APPEND_ONLY_FUNCTION
 
-from .conftest import JKT, alembic, insert, make_user, unique
+from .conftest import JKT, alembic, insert, make_session, make_user, unique
 
 
 async def _schema_diff(engine: AsyncEngine) -> list:
@@ -307,4 +307,48 @@ async def test_0003_rellena_nombre_de_acciones_existentes(
                     {"a": app_ids},
                 )
     assert "name" in await _action_columns(engine)
+    assert await _schema_diff(engine) == []
+
+
+async def test_0005_admite_password_change_y_el_downgrade_lo_reasigna_a_admin(
+    engine: AsyncEngine,
+) -> None:
+    """`0005` agrega el motivo `password-change`; al bajar, las filas que lo
+    usan pasan a `admin` (el CHECK antiguo no lo admite) y el resto se conserva."""
+    user_id = None
+    try:
+        async with engine.begin() as connection:
+            user_id = await make_user(connection)
+            changed = await make_session(connection, user_id)
+            closed = await make_session(connection, user_id)
+        async with engine.begin() as connection:
+            for sid, reason in ((changed, "password-change"), (closed, "logout")):
+                await connection.execute(
+                    text(
+                        "UPDATE sessions SET revoked_at = now(), "
+                        "revoked_reason = :r WHERE id = :id"
+                    ),
+                    {"r": reason, "id": sid},
+                )
+        alembic("downgrade", "0004")
+        async with engine.connect() as connection:
+            reasons = {
+                r.id: r.revoked_reason
+                for r in await connection.execute(
+                    text("SELECT id, revoked_reason FROM sessions WHERE user_id = :u"),
+                    {"u": user_id},
+                )
+            }
+        assert reasons == {changed: "admin", closed: "logout"}
+        alembic("upgrade", "head")
+    finally:
+        alembic("upgrade", "head")
+        if user_id is not None:
+            async with engine.begin() as connection:
+                await connection.execute(
+                    text("DELETE FROM sessions WHERE user_id = :u"), {"u": user_id}
+                )
+                await connection.execute(
+                    text("DELETE FROM users WHERE id = :u"), {"u": user_id}
+                )
     assert await _schema_diff(engine) == []

@@ -77,6 +77,7 @@ from app.modules.auth.schemas import (
     MeResponse,
     MeSession,
     MeUser,
+    PasswordChange,
     RefreshTokenGrant,
     ServiceTokenResponse,
     SessionRead,
@@ -86,6 +87,9 @@ from app.modules.auth.schemas import (
 INVALID_CREDENTIALS = "Usuario o contraseña incorrectos."
 TOO_MANY_ATTEMPTS = (
     "Demasiados intentos de inicio de sesión. Intenta de nuevo más tarde."
+)
+TOO_MANY_PASSWORD_ATTEMPTS = (
+    "Demasiados intentos de cambio de contraseña. Intenta de nuevo más tarde."
 )
 SESSION_EXPIRED = "Tu sesión expiró. Inicia sesión de nuevo."
 IDLE_EXPIRED = "Tu sesión se cerró por inactividad. Inicia sesión de nuevo."
@@ -104,9 +108,21 @@ class LoginLimiters:
     # Fallos de logins que NO existen: imitan el bloqueo de los que si
     # existen, para no revelar cuales existen.
     unknown_failures: SlidingWindowLimiter
+    # Cambio de contrasena propio (sesion ya autenticada): intentos por IP y
+    # por usuario, y contrasenas actuales incorrectas por usuario.
+    password_by_ip: SlidingWindowLimiter
+    password_by_user: SlidingWindowLimiter
+    password_failures: SlidingWindowLimiter
 
     def reset(self) -> None:
-        for limiter in (self.by_ip, self.by_login, self.unknown_failures):
+        for limiter in (
+            self.by_ip,
+            self.by_login,
+            self.unknown_failures,
+            self.password_by_ip,
+            self.password_by_user,
+            self.password_failures,
+        ):
             limiter.reset()
 
 
@@ -121,6 +137,13 @@ def login_limiters() -> LoginLimiters:
             by_ip=SlidingWindowLimiter(s.leo_login_rate_limit_per_minute, 60),
             by_login=SlidingWindowLimiter(s.leo_login_rate_limit_per_minute, 60),
             unknown_failures=SlidingWindowLimiter(
+                s.leo_login_max_failed_attempts, s.leo_login_lock_minutes * 60
+            ),
+            password_by_ip=SlidingWindowLimiter(s.leo_login_rate_limit_per_minute, 60),
+            password_by_user=SlidingWindowLimiter(
+                s.leo_login_rate_limit_per_minute, 60
+            ),
+            password_failures=SlidingWindowLimiter(
                 s.leo_login_max_failed_attempts, s.leo_login_lock_minutes * 60
             ),
         )
@@ -350,6 +373,7 @@ async def me(session: AsyncSession, principal: Principal) -> MeResponse:
         user=MeUser(
             id=identity.id,
             username=identity.username,
+            name=identity.full_name,
             email=identity.email,
             first_name=identity.first_name,
             last_name=identity.last_name,
@@ -365,6 +389,78 @@ async def me(session: AsyncSession, principal: Principal) -> MeResponse:
             MeApplication(slug=a.slug, name=a.name, base_url=a.base_url) for a in apps
         ],
     )
+
+
+# --- autogestion: perfil y contrasena propios (solo sesion SSO, sin `leo.*`) ---
+
+
+def _self_actor(principal: Principal, meta: RequestMeta) -> Actor:
+    return Actor(principal.user_id, principal.username, principal.session_id, meta)
+
+
+async def update_profile(
+    session: AsyncSession,
+    principal: Principal,
+    data: users.ProfileUpdate,
+    meta: RequestMeta,
+) -> MeResponse:
+    """Edita nombres/correo del usuario de la sesion (nunca otro: no hay id
+    en la ruta). Devuelve el `MeResponse` actualizado."""
+    if await users.update_own_profile(
+        session, principal.user_id, data, _self_actor(principal, meta)
+    ):
+        await session.commit()
+    return await me(session, principal)
+
+
+async def change_password(
+    session: AsyncSession,
+    principal: Principal,
+    data: PasswordChange,
+    meta: RequestMeta,
+) -> None:
+    """Cambia la contrasena propia y cierra TODAS las otras sesiones del
+    usuario (motivo `password-change`); la actual se mantiene. Rate limit por
+    IP y por usuario, y bloqueo por contrasenas actuales incorrectas."""
+    limiters = login_limiters()
+    now = clock.now()
+    user_key, ip_key = str(principal.user_id), meta.ip or "desconocida"
+    wait = max(
+        limiters.password_by_ip.retry_after(ip_key, now),
+        limiters.password_by_user.retry_after(user_key, now),
+        limiters.password_failures.retry_after(user_key, now),
+    )
+    if wait:
+        raise TooManyRequestsError(TOO_MANY_PASSWORD_ATTEMPTS, wait)
+    limiters.password_by_ip.hit(ip_key, now)
+    limiters.password_by_user.hit(user_key, now)
+
+    actor = _self_actor(principal, meta)
+    try:
+        await users.change_own_password(
+            session, principal.user_id, data.current_password, data.new_password, actor
+        )
+    except UnauthorizedError:
+        limiters.password_failures.hit(user_key, now)
+        await audit.record_and_commit(
+            session,
+            actor.entry(
+                "leo.users.reset-password",
+                result="denied",
+                entity_type="user",
+                entity_id=str(principal.user_id),
+                reason="autogestión: contraseña actual incorrecta.",
+            ),
+        )
+        raise
+    limiters.password_failures.reset(user_key)
+    await revoke_user_sessions(
+        session,
+        principal.user_id,
+        SessionRevokedReason.PASSWORD_CHANGE,
+        except_session_id=principal.session_id,
+    )
+    await session.commit()
 
 
 async def logout(
@@ -426,11 +522,18 @@ async def revoke_session_by_admin(
 
 
 async def revoke_user_sessions(
-    session: AsyncSession, user_id: UUID, reason: str
+    session: AsyncSession,
+    user_id: UUID,
+    reason: str,
+    *,
+    except_session_id: UUID | None = None,
 ) -> None:
-    """Revoca todas las sesiones (y sus tokens) de un usuario. Sin commit."""
+    """Revoca todas las sesiones (y sus tokens) de un usuario, salvo
+    `except_session_id` si se da. Sin commit."""
     now = clock.now()
-    for session_id in await repository.active_session_ids_of_user(session, user_id):
+    for session_id in await repository.active_session_ids_of_user(
+        session, user_id, except_session_id
+    ):
         await repository.revoke_session(
             session, session_id, SessionRevokedReason(reason), now
         )

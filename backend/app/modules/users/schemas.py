@@ -83,6 +83,18 @@ class UserUpdate(UpdateModel):
     last_name: PersonName | None = None
 
 
+class ProfileUpdate(UpdateModel):
+    """Autogestion (`PATCH /auth/me/profile`): SOLO nombres y correo. Cualquier
+    otro campo (usuario, documento, estado, roles, contrasena) lo rechaza
+    `extra="forbid"`."""
+
+    non_nullable_fields = ("email", "first_name", "last_name")
+
+    email: Email | None = None
+    first_name: PersonName | None = None
+    last_name: PersonName | None = None
+
+
 class PasswordReset(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

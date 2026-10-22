@@ -137,6 +137,21 @@ async def test_revocar_sesion_exige_motivo_valido(
     assert await expect_error(sql, {"id": session_id, "r": "logout"}) is None
 
 
+async def test_revocar_sesion_admite_password_change(
+    conn: AsyncConnection, expect_error: ExpectError
+) -> None:
+    session_id = await make_session(conn, await make_user(conn))
+    sql = "UPDATE sessions SET revoked_at = now(), revoked_reason = :r WHERE id = :id"
+    assert await expect_error(sql, {"id": session_id, "r": "password-change"}) is None
+    # Sigue yendo en pareja: motivo sin fecha de revocacion se rechaza.
+    other = await make_session(conn, await make_user(conn))
+    error = await expect_error(
+        "UPDATE sessions SET revoked_reason = 'password-change' WHERE id = :id",
+        {"id": other},
+    )
+    assert error == CHECK_VIOLATION
+
+
 # --- tokens ---
 
 

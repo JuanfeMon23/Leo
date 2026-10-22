@@ -22,6 +22,7 @@ from app.core.audit import Actor, diff, snapshot
 from app.core.exceptions import (
     ConflictError,
     DuplicateValueError,
+    UnauthorizedError,
     ValidationAppError,
     not_found,
 )
@@ -39,6 +40,7 @@ from app.modules.users import repository
 from app.modules.users.models import User, UserRole
 from app.modules.users.schemas import (
     PasswordReset,
+    ProfileUpdate,
     UserCreate,
     UserDetail,
     UserRead,
@@ -58,6 +60,8 @@ USER_FIELDS = (
     "failed_login_attempts",
     "locked_until",
 )
+PROFILE_FIELDS = ("first_name", "last_name", "email")
+SELF_SERVICE_REASON = "autogestión"
 _USER = "un usuario"
 
 
@@ -325,6 +329,88 @@ async def reset_password(
     await auth.revoke_user_sessions(session, user.id, "admin")
     await session.commit()
     return UserRead.model_validate(user)
+
+
+# --- autogestion (el propio usuario; la ruta vive en `auth`) ---
+#
+# Se reutilizan los tags `leo.users.edit` y `leo.users.reset-password` solo
+# como ACCION AUDITADA (para que el historial muestre el mismo tipo de cambio
+# sea un admin o la propia persona). NO se chequean como permiso: la
+# autogestion solo exige la sesion SSO, y `reason="autogestión"` la distingue.
+
+
+async def update_own_profile(
+    session: AsyncSession, user_id: UUID, data: ProfileUpdate, actor: Actor
+) -> bool:
+    """Cambia nombres/correo del propio usuario. True si hubo cambios reales;
+    si no, no escribe ni audita. Sin commit."""
+    user = await get_or_404(session, User, user_id, _USER)
+    changes = {
+        name: value
+        for name, value in data.model_dump(exclude_unset=True).items()
+        if getattr(user, name) != value
+    }
+    if not changes:
+        return False
+    await _check_unique(
+        session, email=changes.get("email"), document=None, exclude_id=user.id
+    )
+    before = snapshot(user, PROFILE_FIELDS)
+    for name, value in changes.items():
+        setattr(user, name, value)
+    await session.flush()
+    await session.refresh(user)
+    await audit.record_event(
+        session,
+        actor.entry(
+            "leo.users.edit",
+            entity_type="user",
+            entity_id=str(user.id),
+            changes=diff(before, snapshot(user, PROFILE_FIELDS)),
+            reason=SELF_SERVICE_REASON,
+        ),
+    )
+    return True
+
+
+async def change_own_password(
+    session: AsyncSession,
+    user_id: UUID,
+    current_password: str,
+    new_password: str,
+    actor: Actor,
+) -> None:
+    """Cambia la contrasena del propio usuario: exige la actual, aplica la
+    politica compartida, rechaza reusar la actual y reinicia intentos y
+    bloqueo. Sin commit ni revocar sesiones (lo hace quien llama). Lanza
+    `UnauthorizedError(invalid_credentials)` si la actual no coincide."""
+    user = await get_or_404(session, User, user_id, _USER)
+    if not verify_password(user.password_hash, current_password):
+        raise UnauthorizedError(
+            "La contraseña actual no es correcta.", code="invalid_credentials"
+        )
+    _check_password(new_password, user.username, user.email)
+    if verify_password(user.password_hash, new_password):
+        raise ValidationAppError(
+            "La contraseña nueva debe ser distinta de la actual.",
+            code="same_password",
+        )
+    before = snapshot(user, USER_FIELDS)
+    user.password_hash = hash_password(new_password)
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    await session.flush()
+    await session.refresh(user)
+    await audit.record_event(
+        session,
+        actor.entry(
+            "leo.users.reset-password",
+            entity_type="user",
+            entity_id=str(user.id),
+            changes=diff(before, snapshot(user, USER_FIELDS)),
+            reason=SELF_SERVICE_REASON,
+        ),
+    )
 
 
 async def add_roles(
