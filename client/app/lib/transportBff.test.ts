@@ -293,3 +293,12 @@ describe('createLeoBffTransport: request y configuración', () => {
     expect(toLeoMe({ user: SDK_USER }, 900).session.idle_timeout_seconds).toBe(900)
   })
 })
+
+describe('toLeoMe nombres', () => {
+  it('usa first_name/last_name del SDK y cae a name cuando no llegan', () => {
+    const base = { id: 'u', username: 'ana', name: 'Ana Pérez' }
+    expect(toLeoMe({ user: { ...base, first_name: 'Ana', last_name: 'Pérez' } }, 1).user)
+      .toMatchObject({ name: 'Ana Pérez', first_name: 'Ana', last_name: 'Pérez' })
+    expect(toLeoMe({ user: base }, 1).user).toMatchObject({ name: 'Ana Pérez', first_name: 'Ana Pérez', last_name: '' })
+  })
+})

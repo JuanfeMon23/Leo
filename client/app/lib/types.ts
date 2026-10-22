@@ -2,6 +2,8 @@
 export interface LeoUser {
   id: string
   username: string
+  /** Nombre completo (si Leo/SDK lo entrega). */
+  name?: string
   email: string
   first_name: string
   last_name: string

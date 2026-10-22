@@ -215,6 +215,8 @@ export interface LeoSdkMeBody {
     id: string
     username: string
     name?: string
+    first_name?: string
+    last_name?: string
     email?: string
     permissions?: string[]
     session_id?: string
@@ -231,10 +233,11 @@ export function toLeoMe(body: LeoSdkMeBody, defaultIdleTimeoutSeconds: number): 
     user: {
       id: user.id,
       username: user.username,
+      name: user.name ?? '',
       email: user.email ?? '',
-      // El SDK entrega un solo `name`.
-      first_name: user.name ?? '',
-      last_name: ''
+      // El SDK entrega `name` y, desde `LeoUser.public()`, first_name/last_name.
+      first_name: user.first_name ?? user.name ?? '',
+      last_name: user.last_name ?? ''
     },
     session: {
       id: body.session?.id ?? user.session_id ?? '',
