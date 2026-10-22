@@ -10,6 +10,20 @@ import { fileURLToPath } from 'node:url'
  * esta capa: `extends: ['andromeda', 'leo-client']`), porque los componentes
  * de la barra usan `Ui*` y los tokens de Andromeda.
  *
+ * ── Contrato de la barra superior (<LeoTopBar>), idéntica en todas las apps ──
+ * `LeoTopBar` renderiza SU PROPIO `<header>` completo (alto h-14, fondo, borde,
+ * sticky top-0, z-20, padding). La app lo monta como hijo directo de la
+ * columna de contenido (la que deja sitio a su menú lateral), SIN envolverlo
+ * en contenedores con estilos propios ni pasarle `class`, y SIN repetir
+ * dentro ni el nombre de la app ni el usuario. Solo aporta:
+ *   - `#start`: hamburguesa del menú lateral (`UiButton` ghost, `icon-only`,
+ *     `lg:hidden`, `aria-label="Abrir menú"`) o logo, según su layout;
+ *   - `#end` (opcional): acciones propias de la app (botones pequeños de
+ *     `h-10`), a la izquierda del selector de aplicaciones.
+ * `appName` (prop) solo si el nombre de Leo no sirve; por defecto sale de
+ * `NUXT_PUBLIC_LEO_APP_SLUG`/`APP_NAME`. Sin modo oscuro: Andromeda no define
+ * tokens oscuros (la barra solo usa tokens, así que lo heredará).
+ *
  * ── Configuración para APPS del ecosistema (transporte `bff`) ──────────────
  * La app habla solo con SU backend (FastAPI con `leo_sdk` y `leo_router`).
  * Variables (`.env` de la app Nuxt), mínimas:

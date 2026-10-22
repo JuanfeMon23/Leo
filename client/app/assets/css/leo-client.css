@@ -5,6 +5,12 @@
  * node_modules), así que la detección automática de Tailwind no la ve. Aquí
  * se toma el tema de Andromeda por referencia (sin repetir su CSS) y se
  * generan solo las utilidades que usan los archivos de esta capa.
+ *
+ * Responsive: esta hoja se carga ANTES que la de Andromeda (y la de la app), y
+ * a igual especificidad gana la regla posterior. Una clase base (`hidden`,
+ * `px-3`, `block`) de otra hoja anularía su variante aquí (`sm:block`). En
+ * esta capa los cambios por ancho se escriben con variantes excluyentes
+ * (`max-sm:hidden`, `max-sm:px-3 sm:px-6`), nunca "base + variante".
  */
 /* Fija el orden de capas antes que cualquier otra declaración: esta hoja se carga antes que la de Andromeda y, sin esto, `utilities` quedaría por debajo de `base` (preflight) y se anularían paddings, bordes y fondos. */
 @layer theme, base, components, utilities;
