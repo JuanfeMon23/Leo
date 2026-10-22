@@ -22,7 +22,7 @@ export class LeoApiError extends Error {
   }
 
   static async fromResponse(response: Response): Promise<LeoApiError> {
-    type Body = { code?: unknown, message?: unknown, details?: unknown }
+    type Body = { code?: unknown, message?: unknown, details?: unknown, detail?: unknown }
     let body: Body | null = null
     try {
       const parsed: unknown = await response.json()
@@ -30,11 +30,23 @@ export class LeoApiError extends Error {
     } catch {
       body = null // HTML de un proxy, cuerpo vacío…: no se muestra nunca
     }
+    if (response.status === 422 && Array.isArray(body?.detail)) return fromFastApiValidation(response, body.detail)
     const code = typeof body?.code === 'string' ? body.code : 'http_error'
     const message = typeof body?.message === 'string' ? body.message : ''
     const details = body?.details ?? null
     return new LeoApiError(response.status, code, message, details, retryAfter(details, response))
   }
+}
+
+/** 422 de FastAPI (`{detail: [{loc, msg}]}`, sin el formato de Leo) → `validation_error` por campo. */
+function fromFastApiValidation(response: Response, detail: unknown[]): LeoApiError {
+  const details = detail.flatMap((d) => {
+    const { loc, msg } = (d ?? {}) as { loc?: unknown, msg?: unknown }
+    if (!Array.isArray(loc) || typeof msg !== 'string') return []
+    const path = loc[0] === 'body' || loc[0] === 'query' || loc[0] === 'path' ? loc.slice(1) : loc
+    return [{ field: path.join('.'), message: msg }]
+  })
+  return new LeoApiError(422, 'validation_error', 'Algunos datos no son válidos. Revisa los campos marcados.', details, retryAfter(details, response))
 }
 
 function retryAfter(details: unknown, response: Response): number | null {
