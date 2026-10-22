@@ -9,11 +9,11 @@ enableAutoUnmount(afterEach)
 const { navigateToMock } = vi.hoisted(() => ({ navigateToMock: vi.fn(async () => {}) }))
 mockNuxtImport('navigateTo', () => navigateToMock)
 
-const leoConfig = () => useRuntimeConfig().public.leo as { transport: string, leoUrl: string }
+const leoConfig = () => useRuntimeConfig().public.leo as { transport: string, url: string }
 
 beforeEach(() => {
   leoConfig().transport = 'leo-direct'
-  leoConfig().leoUrl = ''
+  leoConfig().url = ''
   navigateToMock.mockClear()
   useState('leo-session').value = {
     status: 'authenticated',
@@ -192,9 +192,9 @@ describe('LeoTopBar: menú de usuario', () => {
     expect(wrapper.findAll('[role="menuitem"]')[0]!.attributes('href')).toBe('/profile')
   })
 
-  it('bff: "Mi perfil" apunta a leoUrl con return codificado', async () => {
+  it('bff: "Mi perfil" apunta a la URL de Leo con return codificado', async () => {
     leoConfig().transport = 'bff'
-    leoConfig().leoUrl = 'http://localhost:3100'
+    leoConfig().url = 'http://localhost:3100'
     const wrapper = await mountSuspended(LeoTopBar)
     await open(wrapper)
     const href = wrapper.findAll('[role="menuitem"]')[0]!.attributes('href')!
@@ -202,7 +202,7 @@ describe('LeoTopBar: menú de usuario', () => {
     expect(decodeURIComponent(href.split('return=')[1]!)).toBe(globalThis.location.href.split('#')[0])
   })
 
-  it('bff sin leoUrl: oculta "Mi perfil" y deja los datos y cerrar sesión', async () => {
+  it('bff sin url de Leo: oculta "Mi perfil" y deja los datos y cerrar sesión', async () => {
     leoConfig().transport = 'bff'
     const wrapper = await mountSuspended(LeoTopBar)
     await open(wrapper)

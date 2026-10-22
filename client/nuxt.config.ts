@@ -36,7 +36,7 @@ import { fileURLToPath } from 'node:url'
  *
  * Opcionales: NUXT_PUBLIC_LEO_AUTH_PATH (prefijo de `leo_router`, `/auth`),
  * NUXT_PUBLIC_LEO_URL (URL pública del frontend de Leo, p. ej. http://localhost:3100:
- * destino de "Mi perfil" en el menú de usuario, `<leoUrl>/profile?return=<URL de la app>`;
+ * destino de "Mi perfil" en el menú de usuario, `<url>/profile?return=<URL de la app>`;
  * sin ella el enlace se oculta), NUXT_PUBLIC_LEO_CALLBACK_PATH (ruta del FRONTEND que recibe `?code&state`,
  * `/auth/callback`) y NUXT_PUBLIC_LEO_IDLE_TIMEOUT_SECONDS (1800: `leo_sdk` no
  * entrega el tiempo de inactividad en `/auth/me`).
@@ -69,7 +69,7 @@ export default defineNuxtConfig({
         /** URL pública del backend tal como la valida (`htu`; `PUBLIC_URL` del SDK en `bff`). NUXT_PUBLIC_LEO_PUBLIC_URL */
         publicUrl: '',
         /** `bff`: URL pública del frontend de Leo (enlace "Mi perfil"; vacío = sin enlace). NUXT_PUBLIC_LEO_URL */
-        leoUrl: '',
+        url: '',
         /** `bff`: prefijo de `leo_router` en el backend. NUXT_PUBLIC_LEO_AUTH_PATH */
         authPath: '/auth',
         /** `bff`: ruta del FRONTEND de retorno de login (debe coincidir con la redirect_uri). NUXT_PUBLIC_LEO_CALLBACK_PATH */
