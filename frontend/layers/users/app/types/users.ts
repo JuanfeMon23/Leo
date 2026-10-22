@@ -117,12 +117,6 @@ export interface UsersStatus {
   label: string
 }
 
-export interface UsersPasswordRequirement {
-  id: 'length' | 'lower' | 'upper' | 'digit' | 'symbol' | 'personal'
-  label: string
-  met: boolean
-}
-
 /** Permiso efectivo: nombre legible (principal) y tag técnico (referencia). */
 export interface UsersEffectivePermission {
   id: string
