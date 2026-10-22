@@ -199,9 +199,8 @@ async def test_semilla_rechaza_tipo_de_documento_desconocido(
         await _seed(conn, _settings(admin_document_type="XX"))
 
 
-def test_contrasena_que_contiene_el_usuario_es_debil() -> None:
-    problems = password_weaknesses("Juanfe-Seguro-2026!", username="juanfe")
-    assert problems
+def test_contrasena_que_contiene_el_usuario_ya_no_es_debil() -> None:
+    assert password_weaknesses("Juanfe-Seguro-2026!", username="juanfe") == []
 
 
 def test_contrasena_fuerte_no_tiene_debilidades() -> None:

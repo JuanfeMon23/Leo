@@ -1,5 +1,5 @@
 export interface PasswordRequirement {
-  id: 'length' | 'lower' | 'upper' | 'digit' | 'symbol' | 'personal'
+  id: 'length' | 'lower' | 'upper' | 'digit' | 'symbol'
   label: string
   met: boolean
 }
@@ -17,18 +17,15 @@ export interface PasswordContext {
  * Requisitos de la contraseña y si se cumplen (para el indicador en vivo y
  * para validar). El backend sigue siendo la autoridad; aquí solo se anticipa.
  */
-export function passwordRequirements(password: string, ctx: PasswordContext = {}): PasswordRequirement[] {
+// `ctx` se conserva por compatibilidad: desde 2026-10-22 la política permite contener el usuario o el correo.
+export function passwordRequirements(password: string, _ctx: PasswordContext = {}): PasswordRequirement[] {
   const length = [...password].length
-  const lowered = password.toLowerCase()
-  const local = ctx.email ? ctx.email.split('@', 1)[0] : undefined
-  const personal = [ctx.username, local].some(p => p && p.length >= 3 && lowered.includes(p.toLowerCase()))
   return [
     { id: 'length', label: `Entre ${PASSWORD_MIN} y ${PASSWORD_MAX} caracteres`, met: length >= PASSWORD_MIN && length <= PASSWORD_MAX },
     { id: 'lower', label: 'Una letra minúscula', met: /\p{Ll}/u.test(password) },
     { id: 'upper', label: 'Una letra mayúscula', met: /\p{Lu}/u.test(password) },
     { id: 'digit', label: 'Un número', met: /\p{Nd}/u.test(password) },
-    { id: 'symbol', label: 'Un símbolo (por ejemplo ! ? - _ . @ #)', met: /[^\p{L}\p{N}]/u.test(password) },
-    { id: 'personal', label: 'No contiene el usuario ni la parte del correo antes de la @', met: !personal }
+    { id: 'symbol', label: 'Un símbolo (por ejemplo ! ? - _ . @ #)', met: /[^\p{L}\p{N}]/u.test(password) }
   ]
 }
 

@@ -36,12 +36,13 @@ describe('UsersResetPasswordModal', () => {
     expect(dialog().querySelector('[data-testid="reset-warning"]')!.textContent).toMatch(/cerrarán todas las sesiones/)
   })
 
-  it('contraseña que contiene el usuario: no llama a la API', async () => {
+  it('contraseña que contiene el usuario: ya se acepta y llama a la API', async () => {
+    api.mockResolvedValue(user)
     await mountSuspended(UsersResetPasswordModal, { props: { open: true, user }, attachTo: document.body })
     await type('Clave-luis-2026!')
     submit()
-    await vi.waitFor(() => expect(document.body.textContent).toContain('Falta:'))
-    expect(api).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(api).toHaveBeenCalled())
+    expect(api).toHaveBeenCalledWith('/users/u2/reset-password', { method: 'POST', body: { password: 'Clave-luis-2026!' } })
   })
 
   it('contraseña válida: POST reset-password con solo la contraseña y avisa', async () => {

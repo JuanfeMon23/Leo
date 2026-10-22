@@ -5,9 +5,9 @@ const met = (password: string, ctx = {}) =>
   Object.fromEntries(passwordRequirements(password, ctx).map(r => [r.id, r.met]))
 
 describe('passwordRequirements', () => {
-  it('lista los 6 requisitos del backend, con texto legible', () => {
+  it('lista los 5 requisitos del backend, con texto legible', () => {
     const reqs = passwordRequirements('')
-    expect(reqs.map(r => r.id)).toEqual(['length', 'lower', 'upper', 'digit', 'symbol', 'personal'])
+    expect(reqs.map(r => r.id)).toEqual(['length', 'lower', 'upper', 'digit', 'symbol'])
     expect(reqs.every(r => r.label.length > 5)).toBe(true)
   })
 
@@ -24,13 +24,11 @@ describe('passwordRequirements', () => {
     expect(met('ñÑ')).toMatchObject({ lower: true, upper: true })
   })
 
-  it('no contiene el usuario ni la parte local del correo (≥3 letras, sin distinguir mayúsculas)', () => {
-    expect(met('xxAnaLopezxx', { username: 'analopez' }).personal).toBe(false)
-    expect(met('xxANALOPEZxx', { username: 'analopez' }).personal).toBe(false)
-    expect(met('xxjuanxx', { email: 'juan@x.co' }).personal).toBe(false)
-    expect(met('xxdominioxx', { email: 'juan@dominio.co' }).personal).toBe(true) // solo la parte local
-    expect(met('zzabzz', { username: 'ab' }).personal).toBe(true) // <3: no cuenta
-    expect(met('anything', {}).personal).toBe(true)
+  it('contener el usuario o la parte local del correo ya no es un requisito', () => {
+    const reqs = passwordRequirements('Xanalopez-2026!', { username: 'analopez', email: 'analopez@x.co' })
+    expect(reqs.map(r => r.id)).not.toContain('personal')
+    expect(reqs.every(r => r.met)).toBe(true)
+    expect(passwordProblems('Xanalopez-2026!', { username: 'analopez', email: 'analopez@x.co' })).toEqual([])
   })
 })
 

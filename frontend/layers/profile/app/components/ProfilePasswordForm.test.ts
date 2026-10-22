@@ -46,11 +46,11 @@ describe('ProfilePasswordForm', () => {
   it('los campos son de tipo contraseña y los requisitos se actualizan en vivo', async () => {
     const w = await mountSuspended(ProfilePasswordForm)
     expect(inputs(w).map((i: Attr) => i.attributes('type'))).toEqual(['password', 'password', 'password'])
-    expect(reqs(w)).toEqual(['false', 'false', 'false', 'false', 'false', 'true'])
+    expect(reqs(w)).toEqual(['false', 'false', 'false', 'false', 'false'])
     await inputs(w)[1]!.setValue(NEW)
-    expect(reqs(w)).toEqual(['true', 'true', 'true', 'true', 'true', 'true'])
-    await inputs(w)[1]!.setValue('Hola-ana-2026!') // contiene el usuario
-    expect(reqs(w).at(-1)).toBe('false')
+    expect(reqs(w)).toEqual(['true', 'true', 'true', 'true', 'true'])
+    await inputs(w)[1]!.setValue('Hola-ana-2026!') // contiene el usuario: ya no se penaliza
+    expect(reqs(w)).toEqual(['true', 'true', 'true', 'true', 'true'])
     expect(w.text()).not.toContain('Hola-ana-2026!') // solo vive en el campo
   })
 
