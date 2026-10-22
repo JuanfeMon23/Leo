@@ -15,6 +15,12 @@ export function userInitials(name: string): string {
   return words.slice(0, 2).map(w => Array.from(w)[0]!.toLocaleUpperCase('es')).join('')
 }
 
+/** Inicial (una letra) del avatar de una app; `?` si no hay nombre. */
+export function appInitial(name: string): string {
+  const first = Array.from(name.trim())[0]
+  return first ? first.toLocaleUpperCase('es') : '?'
+}
+
 /**
  * Destino de "Mi perfil". `leo-direct`: ruta interna; `bff`: página de perfil
  * de Leo con `return` = URL de la app actual (nada más). `null` = sin enlace.

@@ -45,7 +45,10 @@ describe('LeoTopBar', () => {
     expect(toggle.attributes('aria-expanded')).toBe('false')
     await toggle.trigger('click')
     const links = wrapper.findAll('a')
-    expect(links.map(a => a.text().replace(/\s+/g, ''))).toEqual(['LeoActual', 'Vladimir'])
+    // Cada enlace lleva ahora un avatar con la inicial (aria-hidden): se compara el nombre y la marca "Actual" por separado.
+    expect(links.map(a => a.get('[data-testid="leo-app-name"]').text())).toEqual(['Leo', 'Vladimir'])
+    expect(links[0]!.text()).toContain('Actual')
+    expect(links[1]!.text()).not.toContain('Actual')
     expect(links[1]!.attributes('href')).toBe('http://localhost:3200')
     expect(links[0]!.attributes('aria-current')).toBe('page')
   })
@@ -55,6 +58,49 @@ describe('LeoTopBar', () => {
     const wrapper = await mountSuspended(LeoTopBar)
     expect(wrapper.text()).not.toContain('Cerrar sesión')
     expect(wrapper.find('[data-testid="leo-user-button"]').exists()).toBe(false)
+  })
+})
+
+describe('LeoTopBar: diseño y selector de aplicaciones', () => {
+  it('renderiza su propio header completo (idéntico en todas las apps) con slots start y end', async () => {
+    const wrapper = await mountSuspended(LeoTopBar, {
+      slots: { start: '<button data-testid="hamb">menú</button>', end: '<span data-testid="extra">extra</span>' }
+    })
+    const header = wrapper.get('header[data-testid="leo-topbar"]')
+    for (const cls of ['sticky', 'top-0', 'z-20', 'h-14', 'border-b', 'border-border']) expect(header.classes()).toContain(cls)
+    const children = Array.from(header.element.children)
+    // #start antes de la marca de la app; #end dentro del grupo derecho.
+    expect(children[0]!.getAttribute('data-testid')).toBe('hamb')
+    expect(header.find('[data-testid="extra"]').exists()).toBe(true)
+  })
+
+  it('el slot end se muestra también sin sesión', async () => {
+    useState('leo-session').value = { status: 'anonymous', me: null }
+    const wrapper = await mountSuspended(LeoTopBar, { slots: { end: '<span data-testid="extra">extra</span>' } })
+    expect(wrapper.find('[data-testid="extra"]').exists()).toBe(true)
+  })
+
+  it('el selector es un desplegable accesible: aria-controls, Esc lo cierra y devuelve el foco', async () => {
+    const wrapper = await mountSuspended(LeoTopBar, { attachTo: document.body })
+    const toggle = wrapper.get('[data-testid="leo-apps-button"]')
+    await toggle.trigger('click')
+    const panel = wrapper.get('[aria-label="Aplicaciones a las que tienes acceso"]')
+    expect(toggle.attributes('aria-controls')).toBe(panel.attributes('id'))
+    expect(toggle.attributes('aria-expanded')).toBe('true')
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await nextTick()
+    expect(wrapper.find('[aria-label="Aplicaciones a las que tienes acceso"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(toggle.element)
+  })
+
+  it('abrir un menú cierra el otro', async () => {
+    const wrapper = await mountSuspended(LeoTopBar, { attachTo: document.body })
+    await wrapper.get('[data-testid="leo-apps-button"]').trigger('click')
+    await wrapper.get('[data-testid="leo-user-button"]').trigger('click')
+    expect(wrapper.find('[aria-label="Aplicaciones a las que tienes acceso"]').exists()).toBe(false)
+    expect(wrapper.find('[role="menu"]').exists()).toBe(true)
+    await wrapper.get('[data-testid="leo-apps-button"]').trigger('click')
+    expect(wrapper.find('[role="menu"]').exists()).toBe(false)
   })
 })
 
@@ -107,6 +153,37 @@ describe('LeoTopBar: menú de usuario', () => {
     document.body.click()
     await nextTick()
     expect(wrapper.find('[role="menu"]').exists()).toBe(false)
+  })
+
+  it('"Cerrar sesión" va en rojo (variante danger de Andromeda) y "Mi perfil" no', async () => {
+    const wrapper = await mountSuspended(LeoTopBar)
+    await open(wrapper)
+    const [profile, logout] = wrapper.findAll('[role="menuitem"]')
+    expect(logout!.classes()).toContain('text-danger-600')
+    expect(logout!.classes()).toContain('hover:bg-danger-50')
+    expect(profile!.classes()).not.toContain('text-danger-600')
+  })
+
+  it('el panel separa tarjeta, "Mi perfil" y "Cerrar sesión" con separadores', async () => {
+    const wrapper = await mountSuspended(LeoTopBar)
+    await open(wrapper)
+    expect(wrapper.findAll('[role="menu"] [role="separator"]')).toHaveLength(2)
+  })
+
+  it('las flechas, Inicio y Fin recorren los ítems del menú', async () => {
+    const wrapper = await mountSuspended(LeoTopBar, { attachTo: document.body })
+    await open(wrapper)
+    await nextTick()
+    const items = wrapper.findAll('[role="menuitem"]')
+    const menu = wrapper.get('[role="menu"]')
+    await menu.trigger('keydown', { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(items[1]!.element)
+    await menu.trigger('keydown', { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(items[0]!.element)
+    await menu.trigger('keydown', { key: 'End' })
+    expect(document.activeElement).toBe(items[1]!.element)
+    await menu.trigger('keydown', { key: 'Home' })
+    expect(document.activeElement).toBe(items[0]!.element)
   })
 
   it('direct: "Mi perfil" es un enlace interno a /profile', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildProfileUrl, userDisplayName, userInitials } from './userMenu'
+import { appInitial, buildProfileUrl, userDisplayName, userInitials } from './userMenu'
 
 const user = (over: Record<string, string | undefined> = {}) => ({
   id: 'u1', username: 'ana', email: 'ana@x.co', first_name: '', last_name: '', ...over
@@ -52,5 +52,16 @@ describe('buildProfileUrl', () => {
   })
   it('bff: leoUrl no http(s) se descarta', () => {
     expect(buildProfileUrl({ transport: 'bff', leoUrl: 'javascript:alert(1)' }, 'http://a/')).toBeNull()
+  })
+})
+
+describe('appInitial', () => {
+  it('primera letra en mayúscula', () => {
+    expect(appInitial('vladimir')).toBe('V')
+    expect(appInitial('  álamo')).toBe('Á')
+  })
+  it('sin nombre: ?', () => {
+    expect(appInitial('')).toBe('?')
+    expect(appInitial('   ')).toBe('?')
   })
 })
