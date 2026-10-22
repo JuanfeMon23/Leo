@@ -58,6 +58,7 @@ const collapsedPad = ref(false)
 
     <!-- El contenido deja el espacio de la barra lateral en pantallas grandes -->
     <div class="transition-all duration-200 lg:pl-64" :class="{ 'lg:!pl-[4.5rem]': collapsedPad }">
+      <!-- Contrato de leo-client (client/nuxt.config.ts): LeoTopBar trae su propio <header>; sin envoltorio ni clases. -->
       <LeoTopBar />
       <main class="mx-auto max-w-6xl px-4 py-6">
         <slot />

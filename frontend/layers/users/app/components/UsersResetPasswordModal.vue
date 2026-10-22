@@ -45,7 +45,7 @@ const onSubmit = form.submit(async (v) => {
       Se cerrarán todas las sesiones abiertas de {{ usersFullName(user) }}: tendrá que iniciar sesión de nuevo con la contraseña nueva.
     </UiAlert>
     <UiFormField name="password" label="Contraseña nueva" required>
-      <UiTextInput type="password" autocomplete="new-password" />
+      <UiPasswordInput autocomplete="new-password" />
     </UiFormField>
     <UiPasswordRequirements :password="values.password ?? ''" :username="user.username" :email="user.email" />
   </UiFormModal>
