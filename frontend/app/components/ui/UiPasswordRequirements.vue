@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { usersPasswordRequirements } from '../utils/userPassword'
-
 /**
  * Requisitos de la contraseña con el cumplimiento en vivo (misma política que
  * el backend). Solo lee el valor para calcular; no lo guarda ni lo muestra.
@@ -12,7 +10,7 @@ const props = defineProps<{
 }>()
 
 const requirements = computed(() =>
-  usersPasswordRequirements(props.password ?? '', { username: props.username, email: props.email })
+  passwordRequirements(props.password ?? '', { username: props.username, email: props.email })
 )
 </script>
 

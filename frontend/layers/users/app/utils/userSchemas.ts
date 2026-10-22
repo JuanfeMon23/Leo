@@ -1,12 +1,12 @@
 import { z } from 'zod'
 import { zRequiredEnum, zRequiredText } from '#andromeda/utils/zodFields'
+import { zEmail } from '../../../../app/utils/email'
 import { USERS_DOCUMENT_TYPES } from '../types/users'
-import type { UsersPasswordContext } from './userPassword'
-import { usersPasswordProblems } from './userPassword'
+import type { PasswordContext } from '../../../../app/utils/password'
+import { passwordProblems } from '../../../../app/utils/password'
 
 // Mismos patrones que el backend (modules/users/models.py).
 export const USERS_USERNAME_REGEX = /^[a-z0-9]([a-z0-9._-]{1,62})[a-z0-9]$/
-export const USERS_EMAIL_REGEX = /^[^@\s]+@[^@\s]+$/
 export const USERS_DOCUMENT_NUMBER_REGEX = /^[0-9A-Z]+(-[0-9A-Z]+)*$/
 
 export const USERS_DOCUMENT_LABELS: Record<typeof USERS_DOCUMENT_TYPES[number], string> = {
@@ -31,12 +31,6 @@ const zUsername = z.preprocess(
     })
 )
 
-const zEmail = z.string({ required_error: 'El correo es obligatorio.' })
-  .trim()
-  .min(1, 'El correo es obligatorio.')
-  .max(254, 'Máximo 254 caracteres.')
-  .regex(USERS_EMAIL_REGEX, 'Ingresa un correo electrónico válido.')
-
 const zDocumentNumber = z.preprocess(
   v => (typeof v === 'string' ? v.trim().toUpperCase() : v),
   z.string({ required_error: 'El número de documento es obligatorio.' })
@@ -56,9 +50,9 @@ const personFields = {
 const zPassword = () =>
   z.string({ required_error: 'La contraseña es obligatoria.' }).min(1, 'La contraseña es obligatoria.')
 
-function checkPassword(password: string, ctx: UsersPasswordContext, issue: z.RefinementCtx) {
+function checkPassword(password: string, ctx: PasswordContext, issue: z.RefinementCtx) {
   if (!password) return
-  const problems = usersPasswordProblems(password, ctx)
+  const problems = passwordProblems(password, ctx)
   if (problems.length) {
     const lower = problems.map(p => p.charAt(0).toLowerCase() + p.slice(1))
     issue.addIssue({ code: 'custom', path: ['password'], message: `Falta: ${lower.join('; ')}.` })
@@ -73,7 +67,7 @@ export const userCreateSchema = z
 export const userEditSchema = z.object(personFields)
 
 /** Reseteo de contraseña: la política depende del usuario al que se le asigna. */
-export function passwordResetSchema(ctx: UsersPasswordContext) {
+export function passwordResetSchema(ctx: PasswordContext) {
   return z.object({ password: zPassword() }).superRefine((v, issue) => checkPassword(v.password, ctx, issue))
 }
 

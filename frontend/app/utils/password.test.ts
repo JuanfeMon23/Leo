@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { usersPasswordProblems, usersPasswordRequirements } from './userPassword'
+import { passwordProblems, passwordRequirements } from './password'
 
 const met = (password: string, ctx = {}) =>
-  Object.fromEntries(usersPasswordRequirements(password, ctx).map(r => [r.id, r.met]))
+  Object.fromEntries(passwordRequirements(password, ctx).map(r => [r.id, r.met]))
 
-describe('usersPasswordRequirements', () => {
+describe('passwordRequirements', () => {
   it('lista los 6 requisitos del backend, con texto legible', () => {
-    const reqs = usersPasswordRequirements('')
+    const reqs = passwordRequirements('')
     expect(reqs.map(r => r.id)).toEqual(['length', 'lower', 'upper', 'digit', 'symbol', 'personal'])
     expect(reqs.every(r => r.label.length > 5)).toBe(true)
   })
@@ -34,12 +34,12 @@ describe('usersPasswordRequirements', () => {
   })
 })
 
-describe('usersPasswordProblems', () => {
+describe('passwordProblems', () => {
   it('vacío para una contraseña fuerte', () => {
-    expect(usersPasswordProblems('Segura-Clave-2026', { username: 'ana', email: 'a@x.co' })).toEqual([])
+    expect(passwordProblems('Segura-Clave-2026', { username: 'ana', email: 'a@x.co' })).toEqual([])
   })
 
   it('devuelve las etiquetas de lo que falta', () => {
-    expect(usersPasswordProblems('corta').length).toBe(4) // largo, mayúscula, dígito, símbolo
+    expect(passwordProblems('corta').length).toBe(4) // largo, mayúscula, dígito, símbolo
   })
 })
