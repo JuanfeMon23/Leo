@@ -49,11 +49,11 @@ describe('passwordChangeSchema', () => {
     expect(issues(schema, { ...valid, new_password: 'corta', confirm_password: 'corta' }).new_password).toMatch(/^Falta:/)
   })
 
-  it('no puede contener el usuario ni la parte local del correo', () => {
+  it('puede contener el usuario o la parte local del correo (ya no está prohibido)', () => {
     const r = issues(schema, { ...valid, new_password: 'Hola-ana.perez-2026', confirm_password: 'Hola-ana.perez-2026' })
-    expect(r.new_password).toMatch(/usuario/)
+    expect(r.new_password).toBeUndefined()
     const r2 = issues(schema, { ...valid, new_password: 'Hola-ANA-2026-x', confirm_password: 'Hola-ANA-2026-x' })
-    expect(r2.new_password).toMatch(/correo/)
+    expect(r2.new_password).toBeUndefined()
   })
 
   it('debe ser distinta de la actual', () => {

@@ -53,11 +53,11 @@ async def test_contrasena_debil_422_con_motivos(admin):
     assert "debe incluir una mayúscula" in body["details"]["password"]
 
 
-async def test_contrasena_que_contiene_el_usuario_se_rechaza(admin):
+async def test_contrasena_que_contiene_el_usuario_se_acepta(admin):
     response = await admin.post(
         USERS, json=new_user("carlos", password="Carlos-Secreto-2026!")
     )
-    assert response.status_code == 422
+    assert response.status_code == 201, response.text
 
 
 async def test_email_duplicado_sin_distinguir_mayusculas(admin):

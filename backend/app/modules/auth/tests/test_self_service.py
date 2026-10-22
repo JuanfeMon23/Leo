@@ -381,7 +381,7 @@ async def test_rate_limit_por_ip_con_distintos_usuarios(session, make_browser):
     assert 429 in codes  # LEO_LOGIN_RATE_LIMIT_PER_MINUTE = 20 por IP
 
 
-async def test_contrasena_debil_o_con_datos_personales_422(session, make_browser):
+async def test_contrasena_debil_422(session, make_browser):
     nav = await user_nav(
         session, make_browser, username="marta.lopez", email="marta.lopez@example.com"
     )
@@ -391,8 +391,6 @@ async def test_contrasena_debil_o_con_datos_personales_422(session, make_browser
         "SINMINUSCULAS-123!",
         "SinNumeros-Aqui!!",
         "SinSimbolo12345",
-        "Xmarta.lopezX-1234",  # contiene el usuario
-        "Zmarta.LOPEZ#9876",  # contiene la parte local del email
         "A1!" + "a" * 130,  # demasiado larga
     ]:
         response = await nav.post(PASSWORD, json=passwords(new=weak))
@@ -405,6 +403,18 @@ async def test_contrasena_debil_o_con_datos_personales_422(session, make_browser
     assert weak["details"]["password"]  # requisitos incumplidos, legibles
     assert (await reload(session, nav.user)).password_hash  # sin cambios
     assert (await make_browser().login(nav.user.username)).status_code == 200
+
+
+async def test_contrasena_con_usuario_o_parte_local_del_correo_se_acepta(
+    session, make_browser
+):
+    nav = await user_nav(
+        session, make_browser, username="marta.lopez", email="marta.lopez@example.com"
+    )
+
+    response = await nav.post(PASSWORD, json=passwords(new="Xmarta.lopezX-1234"))
+
+    assert response.status_code in (200, 204), response.text
 
 
 async def test_nueva_igual_a_la_actual_422(session, make_browser):

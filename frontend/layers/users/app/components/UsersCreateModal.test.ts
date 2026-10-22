@@ -45,9 +45,9 @@ describe('UsersCreateModal', () => {
   it('muestra los requisitos de la contraseña y se actualizan al escribir', async () => {
     await mountSuspended(UsersCreateModal, { props: { open: true }, attachTo: document.body })
     const reqs = () => [...dialog().querySelectorAll('[data-testid="password-requirement"]')].map(li => li.getAttribute('data-met'))
-    expect(reqs()).toEqual(['false', 'false', 'false', 'false', 'false', 'true'])
+    expect(reqs()).toEqual(['false', 'false', 'false', 'false', 'false'])
     await type(controls()[6]!, 'Segura-Clave-2026')
-    expect(reqs()).toEqual(['true', 'true', 'true', 'true', 'true', 'true'])
+    expect(reqs()).toEqual(['true', 'true', 'true', 'true', 'true'])
   })
 
   it('un documento con puntos y una contraseña débil no llaman a la API', async () => {

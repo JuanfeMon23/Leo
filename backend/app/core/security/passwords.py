@@ -53,8 +53,10 @@ def password_weaknesses(
 ) -> list[str]:
     """Motivos (en espanol) por los que la contrasena es debil; [] si es fuerte.
 
-    Fuerte = 12-128 caracteres, con minuscula, mayuscula, digito y simbolo, y
-    sin contener el usuario ni la parte local del email.
+    Fuerte = 12-128 caracteres, con minuscula, mayuscula, digito y simbolo.
+    Decision del usuario (2026-10-22): se permite que contenga el usuario o la
+    parte local del email; `username` y `email` se conservan en la firma por
+    compatibilidad con los llamadores, pero ya no entran en la politica.
     """
     problems = []
     if not MIN_PASSWORD_LENGTH <= len(password) <= MAX_PASSWORD_LENGTH:
@@ -69,8 +71,4 @@ def password_weaknesses(
         problems.append("debe incluir un dígito")
     if all(c.isalnum() for c in password):
         problems.append("debe incluir un símbolo")
-    lowered = password.lower()
-    personal = [username, email.split("@", 1)[0] if email else None]
-    if any(p and len(p) >= 3 and p.lower() in lowered for p in personal):
-        problems.append("no debe contener el usuario ni el email")
     return problems

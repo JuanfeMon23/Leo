@@ -52,8 +52,8 @@ describe('userCreateSchema', () => {
   it('contraseña: aplica la política y reporta una razón legible', () => {
     expect(issues({ ...valid, password: 'corta' }).password).toMatch(/caracteres/)
     expect(issues({ ...valid, password: 'sinmayuscula-2026!' }).password).toMatch(/mayúscula/)
-    expect(issues({ ...valid, password: 'Contiene-ana.perez-1' }).password).toMatch(/usuario/)
-    expect(issues({ ...valid, username: 'otro.u', password: 'Contiene-ANA-1234' }).password).toMatch(/correo/)
+    expect(issues({ ...valid, password: 'Contiene-ana.perez-1' }).password).toBeUndefined() // el usuario ya no está prohibido
+    expect(issues({ ...valid, username: 'otro.u', password: 'Contiene-ANA-1234' }).password).toBeUndefined() // ni la parte local del correo
     expect(issues({ ...valid, password: '' }).password).toBeTruthy()
   })
 })
@@ -71,7 +71,7 @@ describe('passwordResetSchema', () => {
   it('valida con la misma política, usando el usuario y correo del contexto', () => {
     const schema = passwordResetSchema({ username: 'ana', email: 'ana@x.co' })
     expect(schema.safeParse({ password: 'Segura-Clave-2026' }).success).toBe(true)
-    expect(schema.safeParse({ password: 'Segura-ana-2026' }).success).toBe(false)
+    expect(schema.safeParse({ password: 'Segura-ana-2026' }).success).toBe(true) // contener el usuario ya no se rechaza
     expect(schema.safeParse({ password: 'corta' }).success).toBe(false)
   })
 })
