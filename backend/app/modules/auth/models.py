@@ -37,6 +37,7 @@ class SessionRevokedReason(enum.StrEnum):
     USER_DEACTIVATED = "user-deactivated"
     REFRESH_REUSE = "refresh-reuse"
     IDLE_TIMEOUT = "idle-timeout"
+    PASSWORD_CHANGE = "password-change"
 
 
 class TokenType(enum.StrEnum):

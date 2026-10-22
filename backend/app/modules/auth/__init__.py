@@ -5,8 +5,8 @@
   DPoP); lo conecta `app/main.py`.
 - `resolve_access_token(session, app_id, token, jkt, touch=...)`: dueno de
   un access token valido de esa app (lo usa la ingesta de auditoria).
-- `revoke_user_sessions(session, user_id, reason)`: revoca todas las
-  sesiones de un usuario (sin commit).
+- `revoke_user_sessions(session, user_id, reason, except_session_id=None)`:
+  revoca todas las sesiones de un usuario salvo una (sin commit).
 - `login_limiters()`: limitadores del login (los tests los reinician).
 - `service_token_limiter()`: limitador de emision de tokens de servicio.
 - `revoke_service_tokens(session, caller_id, audience_id, now)`: revoca

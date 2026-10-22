@@ -23,6 +23,7 @@ from app.core.database import SessionDep
 from app.core.pagination import PaginationDep
 from app.core.request_meta import Meta
 from app.core.schemas import AUTH_ERRORS, Page, error_responses
+from app.modules import users
 from app.modules.auth import controller
 from app.modules.auth.dependencies import RequestDpop, session_cookie_name
 from app.modules.auth.schemas import (
@@ -34,6 +35,7 @@ from app.modules.auth.schemas import (
     IntrospectResponse,
     LoginRequest,
     MeResponse,
+    PasswordChange,
     ServiceTokenResponse,
     SessionRead,
     TokenCheck,
@@ -108,6 +110,42 @@ async def activity(_principal: CurrentPrincipal) -> Response:
 )
 async def me(session: SessionDep, principal: CurrentPrincipal) -> MeResponse:
     return await controller.me(session, principal)
+
+
+@router.patch(
+    "/me/profile",
+    response_model=MeResponse,
+    responses=error_responses(401, 409, 422),
+    summary="Editar mis nombres y correo (autogestión; sin permisos `leo.*`)",
+    description="Solo `first_name`, `last_name` y `email` del usuario de la "
+    "sesión. Usuario, documento, estado y roles no se editan aquí (422). Sin "
+    "cambios reales no escribe. Correo único sin distinguir mayúsculas (409 "
+    "`duplicate`, `details.email`).",
+)
+async def update_profile(
+    session: SessionDep,
+    data: users.ProfileUpdate,
+    principal: CurrentPrincipal,
+    meta: Meta,
+) -> MeResponse:
+    return await controller.update_profile(session, principal, data, meta)
+
+
+@router.post(
+    "/me/password",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(401, 422, 429),
+    summary="Cambiar mi contraseña (autogestión; sin permisos `leo.*`)",
+    description="Exige la contraseña actual (401 `invalid_credentials`), aplica "
+    "la política de contraseñas (422 `weak_password`; `same_password` si es "
+    "igual a la actual) y cierra todas las demás sesiones del usuario; la "
+    "actual se mantiene. 429 `too_many_attempts` con rate limit por usuario e IP.",
+)
+async def change_password(
+    session: SessionDep, data: PasswordChange, principal: CurrentPrincipal, meta: Meta
+) -> Response:
+    await controller.change_password(session, principal, data, meta)
+    return Response(status_code=status.HTTP_204_NO_CONTENT, headers=NO_STORE)
 
 
 @router.post(
