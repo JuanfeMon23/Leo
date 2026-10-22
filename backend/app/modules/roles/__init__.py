@@ -12,12 +12,14 @@
 - `service_access_router`: `/applications/{id}/service-access` (se monta bajo
   `/api/v1/applications`).
 - `roles_brief(session, ids) -> {id: RoleBrief}`.
+- `active_role_brief(session, app_slug, role_slug) -> RoleBrief | None`.
 """
 
 from app.modules.roles.controller import (
     AppAccess,
     RoleBrief,
     accessible_applications,
+    active_role_brief,
     effective_permissions,
     has_access,
     has_service_access,
@@ -31,6 +33,7 @@ __all__ = [
     "AppAccess",
     "RoleBrief",
     "accessible_applications",
+    "active_role_brief",
     "effective_permissions",
     "has_access",
     "has_service_access",

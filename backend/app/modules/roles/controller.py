@@ -13,7 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import clock
 from app.core.audit import Actor, diff, snapshot
-from app.core.db.seeds.catalog import LEO_APP_SLUG
+from app.core.db.seeds.catalog import (
+    LEO_APP_SLUG,
+    LEO_SERVICE_GRANTABLE_ROLE_SLUGS,
+)
 from app.core.exceptions import DuplicateValueError, ValidationAppError, not_found
 from app.core.pagination import Pagination, get_or_404, paginate
 from app.core.schemas import Page
@@ -96,6 +99,14 @@ async def service_permissions(
     return frozenset(
         await repository.service_permissions(session, caller_id, audience_id)
     )
+
+
+async def active_role_brief(
+    session: AsyncSession, app_slug: str, role_slug: str
+) -> RoleBrief | None:
+    """Rol activo (de app activa) por slugs, p. ej. `acuarius`/`paciente`."""
+    r = await repository.active_role_by_slugs(session, app_slug, role_slug)
+    return RoleBrief(r.id, r.application_id, r.slug, r.name, r.is_active) if r else None
 
 
 async def roles_brief(
@@ -343,11 +354,16 @@ async def grant_service_access(
             code="same_application",
         )
     apps = await repository.applications_by_id(session, {r.application_id for r in new})
-    leo_roles = [str(r.id) for r in new if apps[r.application_id].slug == LEO_APP_SLUG]
+    leo_roles = [
+        str(r.id)
+        for r in new
+        if apps[r.application_id].slug == LEO_APP_SLUG
+        and r.slug not in LEO_SERVICE_GRANTABLE_ROLE_SLUGS
+    ]
     if leo_roles:
         raise ValidationAppError(
-            "No se concede acceso de servicio a la aplicación Leo: su API solo "
-            "admite usuarios con sesión.",
+            "No se concede acceso de servicio a la aplicación Leo salvo con sus "
+            "roles de servicio: el resto de su API solo admite usuarios con sesión.",
             {"role_ids": leo_roles},
             code="leo_app_not_grantable",
         )

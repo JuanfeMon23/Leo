@@ -135,3 +135,24 @@ class UserRolesAdd(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     role_ids: list[UUID] = Field(min_length=1, max_length=200)
+
+
+class PatientProvision(UserCreate):
+    """Cuerpo de `POST /users/service/patients` (mismos campos y politica de
+    contrasena que `UserCreate`; el rol `paciente` lo fija el servidor)."""
+
+
+class PatientRead(BaseModel):
+    """Paciente aprovisionado. Sin hash ni datos de bloqueo."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    username: str
+    email: str
+    document_type: DocumentType
+    document_number: str
+    first_name: str
+    last_name: str
+    is_active: bool
+    created_at: datetime

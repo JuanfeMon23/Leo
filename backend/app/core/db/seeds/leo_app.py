@@ -16,6 +16,9 @@ from app.core.db.seeds.catalog import (
     LEO_APP_NAME,
     LEO_APP_SLUG,
     LEO_MODULES,
+    LEO_PROVISION_PATIENT_TAG,
+    LEO_PROVISIONER_ROLE_NAME,
+    LEO_PROVISIONER_ROLE_SLUG,
     derived_action_name,
 )
 from app.modules.applications.models import Action, Application, AppModule
@@ -104,6 +107,37 @@ def seed_leo_admin_role(conn: Connection, app_id: UUID) -> UUID:
             ["role_id", "action_id", "application_id"],
             select(literal(role_id), actions.c.id, actions.c.application_id).where(
                 actions.c.application_id == app_id
+            ),
+        )
+        .on_conflict_do_nothing(index_elements=["role_id", "action_id"])
+    )
+    return role_id
+
+
+def seed_leo_provisioner_role(conn: Connection, app_id: UUID) -> UUID:
+    """Crea `leo-patient-provisioner` (rol concedible a una app llamadora) con
+    la unica accion `leo.users.provision-patient`; devuelve su id."""
+    roles, actions = Role.__table__, Action.__table__
+    conn.execute(
+        insert(roles)
+        .values(
+            application_id=app_id,
+            slug=LEO_PROVISIONER_ROLE_SLUG,
+            name=LEO_PROVISIONER_ROLE_NAME,
+        )
+        .on_conflict_do_nothing(index_elements=["application_id", "slug"])
+    )
+    role_id = conn.scalar(
+        select(roles.c.id).where(
+            roles.c.application_id == app_id, roles.c.slug == LEO_PROVISIONER_ROLE_SLUG
+        )
+    )
+    conn.execute(
+        insert(RoleAction.__table__)
+        .from_select(
+            ["role_id", "action_id", "application_id"],
+            select(literal(role_id), actions.c.id, actions.c.application_id).where(
+                actions.c.tag == LEO_PROVISION_PATIENT_TAG
             ),
         )
         .on_conflict_do_nothing(index_elements=["role_id", "action_id"])

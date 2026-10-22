@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     leo_login_rate_limit_per_minute: int = Field(gt=0)
     leo_service_token_minutes: int = Field(default=10, gt=0, le=60)
     leo_service_token_rate_limit_per_minute: int = Field(default=30, gt=0)
+    leo_provision_rate_limit_per_minute: int = Field(default=20, gt=0)
 
 
 class SeedSettings(BaseSettings):

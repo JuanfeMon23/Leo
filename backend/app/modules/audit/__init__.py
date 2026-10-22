@@ -10,6 +10,7 @@ modulos lo importan como `from app.modules import audit` y llaman
 - `record_change(session, actor, tag, entity_type, entity, before, fields)`:
   flush + diff before/after + evento (sin commit).
 - `record_denied(...)`: hook `on_denied` de `require_action`.
+- `record_service_denied(...)`: idem de `require_service_actor`.
 - `audit_router`: rutas `/api/v1/audit`.
 """
 
@@ -18,6 +19,7 @@ from app.modules.audit.controller import (
     record_change,
     record_denied,
     record_event,
+    record_service_denied,
 )
 from app.modules.audit.router import router as audit_router
 
@@ -27,4 +29,5 @@ __all__ = [
     "record_change",
     "record_denied",
     "record_event",
+    "record_service_denied",
 ]

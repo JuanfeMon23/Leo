@@ -10,9 +10,13 @@ from app.core.authz import require_action, require_actor
 from app.core.database import SessionDep
 from app.core.pagination import ActiveQuery, PaginationDep, SearchQuery
 from app.core.schemas import AUTH_ERRORS, Page, error_responses
+from app.core.service_authz import ServiceCaller, require_service_actor
 from app.modules.users import controller
+from app.modules.users.controller import PROVISION_TAG
 from app.modules.users.schemas import (
     PasswordReset,
+    PatientProvision,
+    PatientRead,
     UserCreate,
     UserDetail,
     UserRead,
@@ -53,6 +57,27 @@ async def create_user(
     actor: Annotated[Actor, require_actor("leo.users.create")],
 ) -> UserRead:
     return await controller.create_user(session, data, actor)
+
+
+@router.post(
+    "/service/patients",
+    status_code=status.HTTP_201_CREATED,
+    response_model=PatientRead,
+    responses=error_responses(401, 403, 409, 422, 429, 503),
+    summary="Crear un paciente (solo apps con credencial de servicio)",
+    description="Autenticación: `Authorization: Bearer <token de servicio>` "
+    "pedido con `grant_type=client_credentials` y `audience=leo`; la app debe "
+    "tener concedido el rol `leo-patient-provisioner` "
+    "(`leo.users.provision-patient`). Crea el usuario activo con el rol "
+    "`acuarius/paciente`. Duplicados: 409 `conflict` genérico.",
+)
+async def provision_patient(
+    session: SessionDep,
+    data: PatientProvision,
+    caller: Annotated[ServiceCaller, require_service_actor(PROVISION_TAG)],
+) -> PatientRead:
+    principal, actor = caller
+    return await controller.provision_patient(session, data, principal, actor)
 
 
 @router.get(

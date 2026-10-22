@@ -8,6 +8,7 @@ from app.core.client_auth import configure_client_auth
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.request_meta import REQUEST_ID_HEADER, RequestIdMiddleware
+from app.core.service_authz import configure_service_authz
 from app.modules import applications, audit, auth, roles, users
 
 API = "/api/v1"
@@ -32,6 +33,9 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
 
     configure_authz(resolver=auth.resolve_principal, on_denied=audit.record_denied)
+    configure_service_authz(
+        resolver=auth.resolve_service_principal, on_denied=audit.record_service_denied
+    )
     configure_client_auth(applications.authenticate_client)
 
     app.include_router(auth.auth_router, prefix=f"{API}/auth")

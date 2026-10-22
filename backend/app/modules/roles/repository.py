@@ -247,3 +247,19 @@ async def service_permissions(
         )
     )
     return set((await session.scalars(stmt)).all())
+
+
+async def active_role_by_slugs(
+    session: AsyncSession, app_slug: str, role_slug: str
+) -> Role | None:
+    """Rol activo `role_slug` de la app activa `app_slug`, o None."""
+    return await session.scalar(
+        select(Role)
+        .join(Application, Application.id == Role.application_id)
+        .where(
+            Application.slug == app_slug,
+            Role.slug == role_slug,
+            Role.is_active,
+            Application.is_active,
+        )
+    )

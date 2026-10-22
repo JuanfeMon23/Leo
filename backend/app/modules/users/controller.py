@@ -15,18 +15,23 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import clock
 from app.core.audit import Actor, diff, snapshot
+from app.core.config import get_settings
 from app.core.exceptions import (
+    AppError,
     ConflictError,
     DuplicateValueError,
+    TooManyRequestsError,
     UnauthorizedError,
     ValidationAppError,
     not_found,
 )
 from app.core.pagination import Pagination, get_or_404, paginate
+from app.core.rate_limit import SlidingWindowLimiter
 from app.core.schemas import Page
 from app.core.security.passwords import (
     burn_verification_time,
@@ -35,11 +40,14 @@ from app.core.security.passwords import (
     password_weaknesses,
     verify_password,
 )
+from app.core.service_authz import ServicePrincipal
 from app.modules import audit, auth, roles
 from app.modules.users import repository
 from app.modules.users.models import User, UserRole
 from app.modules.users.schemas import (
     PasswordReset,
+    PatientProvision,
+    PatientRead,
     ProfileUpdate,
     UserCreate,
     UserDetail,
@@ -468,3 +476,120 @@ async def _audit_roles(
             ),
         ),
     )
+
+
+# --- aprovisionamiento de pacientes por una app con credencial de servicio ---
+
+PATIENT_APP_SLUG = "acuarius"
+PATIENT_ROLE_SLUG = "paciente"
+PROVISION_TAG = "leo.users.provision-patient"
+
+_provision_limiter: SlidingWindowLimiter | None = None
+
+
+def provision_limiter() -> SlidingWindowLimiter:
+    """Altas de pacientes por minuto y por app llamadora (en memoria)."""
+    global _provision_limiter
+    if _provision_limiter is None:
+        _provision_limiter = SlidingWindowLimiter(
+            get_settings().leo_provision_rate_limit_per_minute, 60
+        )
+    return _provision_limiter
+
+
+class PatientConflictError(ConflictError):
+    """409 neutro: no revela si choco el usuario, el email o el documento."""
+
+    code = "conflict"
+
+    def __init__(self) -> None:
+        super().__init__("No se pudo crear el usuario con los datos indicados.")
+
+
+class PatientRoleUnavailableError(AppError):
+    status_code = 503
+    code = "patient_role_unavailable"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "El rol de paciente no está disponible. Intenta de nuevo más tarde."
+        )
+
+
+async def provision_patient(
+    session: AsyncSession,
+    data: PatientProvision,
+    principal: ServicePrincipal,
+    actor: Actor,
+) -> PatientRead:
+    """Crea un usuario activo con el rol `acuarius/paciente` para una app de
+    servicio autorizada. Contrasena debil: 422 (hay que corregirla). Usuario,
+    email o documento repetidos: 409 generico, sin decir cual; el detalle
+    queda en la auditoria. Siempre calcula el hash argon2 para que el tiempo
+    no delate si choco. Audita con actor = servicio."""
+    limiter = provision_limiter()
+    key = str(principal.application_id)
+    wait = limiter.retry_after(key)
+    if wait:
+        raise TooManyRequestsError(
+            "Demasiadas solicitudes de alta. Intenta de nuevo más tarde.", wait
+        )
+    limiter.hit(key)
+
+    _check_password(data.password, data.username, data.email)
+    password_hash = hash_password(data.password)
+    role = await roles.active_role_brief(session, PATIENT_APP_SLUG, PATIENT_ROLE_SLUG)
+    if role is None:
+        raise PatientRoleUnavailableError
+
+    taken = [
+        field
+        for field, is_taken in (
+            ("username", await repository.username_taken(session, data.username)),
+            ("email", await repository.email_taken(session, data.email)),
+            (
+                "document",
+                await repository.document_taken(
+                    session, data.document_type, data.document_number
+                ),
+            ),
+        )
+        if is_taken
+    ]
+    user = User(**data.model_dump(exclude={"password"}), password_hash=password_hash)
+    if not taken:
+        try:
+            async with session.begin_nested():
+                session.add(user)
+                await session.flush()
+                session.add(UserRole(user_id=user.id, role_id=role.id))
+                await session.flush()
+        except IntegrityError:  # carrera con otra alta: mismo resultado
+            taken = ["race"]
+    if taken:
+        await audit.record_and_commit(
+            session,
+            actor.entry(
+                PROVISION_TAG,
+                result="denied",
+                entity_type="user",
+                reason="Alta de paciente rechazada por datos repetidos "
+                f"({', '.join(taken)}).",
+            ),
+        )
+        raise PatientConflictError
+    await session.refresh(user)
+    await audit.record_event(
+        session,
+        actor.entry(
+            PROVISION_TAG,
+            entity_type="user",
+            entity_id=str(user.id),
+            changes=diff(
+                None, snapshot(user, USER_FIELDS) | {"role": f"acuarius/{role.slug}"}
+            ),
+            reason=f"Paciente creado por la aplicación «{principal.client_id}».",
+        ),
+    )
+    await session.commit()
+    return PatientRead.model_validate(user)
