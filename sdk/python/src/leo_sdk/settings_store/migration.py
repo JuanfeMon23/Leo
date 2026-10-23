@@ -14,7 +14,9 @@ Crea `settings` y `settings_history` (mismo DDL que `make_settings_models`,
 construido desde el mismo codigo), el indice del historial y los triggers
 append-only. `fn_forbid_append_only_change()` se crea solo si no existe.
 `users_table` es la tabla de usuarios de la app (PK `id` UUID) a la que
-apuntan las FK. No soporta modo offline (`--sql`).
+apuntan las FK; con `users_table=None` (apps sin tabla de usuarios) las
+columnas `updated_by`/`changed_by` son UUID sin FK (resto del esquema
+idéntico). No soporta modo offline (`--sql`).
 """
 
 from typing import Any
@@ -34,24 +36,27 @@ from leo_sdk.settings_store.triggers import (
 )
 
 
-def _tables(users_table: str) -> tuple[sa.Table, sa.Table]:
+def _tables(users_table: str | None) -> tuple[sa.Table, sa.Table]:
     class _Base(DeclarativeBase):
         pass
 
-    # Tabla de usuarios ficticia: solo para que las FK resuelvan al emitir DDL.
-    sa.Table(
-        users_table,
-        _Base.metadata,
-        sa.Column("id", sa.UUID(), primary_key=True),
-    )
-    models = make_settings_models(_Base, user_pk=f"{users_table}.id")
+    if users_table is None:
+        models = make_settings_models(_Base, user_pk=None)
+    else:
+        # Tabla de usuarios ficticia: solo para que las FK resuelvan al emitir DDL.
+        sa.Table(
+            users_table,
+            _Base.metadata,
+            sa.Column("id", sa.UUID(), primary_key=True),
+        )
+        models = make_settings_models(_Base, user_pk=f"{users_table}.id")
     return (
         models.Setting.__table__,  # type: ignore[attr-defined]
         models.SettingHistory.__table__,  # type: ignore[attr-defined]
     )
 
 
-def upgrade(op: Any, *, users_table: str = "users") -> None:
+def upgrade(op: Any, *, users_table: str | None = "users") -> None:
     bind = op.get_bind()
     settings, history = _tables(users_table)
     settings.create(bind)
@@ -61,7 +66,7 @@ def upgrade(op: Any, *, users_table: str = "users") -> None:
         op.execute(statement)
 
 
-def downgrade(op: Any, *, users_table: str = "users") -> None:
+def downgrade(op: Any, *, users_table: str | None = "users") -> None:
     """Elimina ambas tablas (y sus triggers) con sus filas."""
     bind = op.get_bind()
     settings, history = _tables(users_table)

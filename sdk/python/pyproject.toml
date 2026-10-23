@@ -1,6 +1,6 @@
 [project]
 name = "leo-sdk"
-version = "0.5.0"
+version = "0.6.0"
 description = "Leo SDK: integracion de los backends FastAPI (BFF) con Leo (SSO, permisos, auditoria)"
 readme = "README.md"
 requires-python = ">=3.13"
