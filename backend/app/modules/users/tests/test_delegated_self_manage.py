@@ -16,7 +16,6 @@ from app.core.db.seeds.catalog import (
     LEO_SERVICE_GRANTABLE_ROLE_SLUGS,
 )
 from app.core.db.seeds.leo_app import seed_leo_delegate_role
-from app.core.rate_limit import SlidingWindowLimiter
 from app.core.tests.dpop_keys import DpopKey
 from app.modules.applications.models import Action
 from app.modules.audit.models import AuditEvent
@@ -34,6 +33,7 @@ from app.testkit import (
     make_role,
     make_user,
     pkce_pair,
+    set_setting,
 )
 
 PROFILE = "/api/v1/users/service/delegated/profile"
@@ -129,12 +129,9 @@ class World:
 
 
 @pytest.fixture(autouse=True)
-async def _reset(monkeypatch):
-    """Los tests de rate limit cambian los limitadores del proceso: se restauran."""
-    limiters = login_limiters()
-    monkeypatch.setattr(limiters, "delegated_by_app", limiters.delegated_by_app)
-    monkeypatch.setattr(limiters, "delegated_by_user", limiters.delegated_by_user)
-    await limiters.reset()
+async def _reset():
+    """Los limitadores son de proceso: cada test empieza limpio."""
+    await login_limiters().reset()
 
 
 @pytest.fixture
@@ -548,12 +545,12 @@ async def test_cuerpo_invalido_422_sin_eco_de_contrasenas(world):
 async def test_rate_limit_por_app_llamadora_429(world):
     user = await world.patient()
     token, _ = await world.user_token(user)
-    login_limiters().delegated_by_app = SlidingWindowLimiter(2, 60)
+    await set_setting(world.session, "rate_limit.delegated_app_per_window", 10)
     headers = await world.service_headers()
 
-    codes = [(await world.profile(token, headers=headers, first_name="Z")).status_code for _ in range(3)]
+    codes = [(await world.profile(token, headers=headers, first_name="Z")).status_code for _ in range(11)]
 
-    assert codes == [200, 200, 429]
+    assert codes == [200] * 10 + [429]
     last = await world.profile(token, headers=headers, first_name="Z")
     assert int(last.headers["Retry-After"]) >= 1
 
@@ -563,10 +560,11 @@ async def test_rate_limit_por_usuario_429_sin_afectar_a_otro(world):
     b = await world.patient()
     token_a, _ = await world.user_token(a)
     token_b, _ = await world.user_token(b)
-    login_limiters().delegated_by_user = SlidingWindowLimiter(1, 60)
+    await set_setting(world.session, "rate_limit.delegated_user_per_window", 10)
     headers = await world.service_headers()
 
-    assert (await world.profile(token_a, headers=headers, first_name="Z")).status_code == 200
+    for _ in range(10):
+        assert (await world.profile(token_a, headers=headers, first_name="Z")).status_code == 200
     limited = await world.profile(token_a, headers=headers, first_name="Y")
     assert limited.status_code == 429
     assert int(limited.headers["Retry-After"]) >= 1

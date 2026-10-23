@@ -182,6 +182,42 @@ async def test_audit_events_solo_select_e_insert(roles_db) -> None:
         assert await _sqlstate(roles_db, "leo_app", sql) == INSUFFICIENT_PRIVILEGE, sql
 
 
+async def test_settings_sin_delete_y_su_historial_solo_select_e_insert(
+    roles_db,
+) -> None:
+    key = "roles.prueba"
+    await roles_db.execute("SET ROLE leo_app")
+    try:
+        await roles_db.execute(
+            "INSERT INTO settings (key, value, value_type, default_value, "
+            "group_name, description) VALUES ($1, '5'::jsonb, 'int', '5'::jsonb, "
+            "'g', 'd')",
+            key,
+        )
+        await roles_db.execute(
+            "UPDATE settings SET value = '6'::jsonb, version = 2 WHERE key = $1", key
+        )
+        await roles_db.execute(
+            "INSERT INTO settings_history (setting_key, old_value, new_value, "
+            "version_after, reason) VALUES ($1, '5'::jsonb, '6'::jsonb, 2, 'prueba')",
+            key,
+        )
+        assert await roles_db.fetchval(
+            "SELECT count(*) FROM settings_history WHERE setting_key = $1", key
+        )
+    finally:
+        await roles_db.execute("RESET ROLE")
+    for sql in (
+        "DELETE FROM settings",
+        "TRUNCATE settings",
+        "UPDATE settings_history SET reason = 'otra cosa'",
+        "DELETE FROM settings_history",
+        "TRUNCATE settings_history",
+        "ALTER TABLE settings_history DISABLE TRIGGER ALL",
+    ):
+        assert await _sqlstate(roles_db, "leo_app", sql) == INSUFFICIENT_PRIVILEGE, sql
+
+
 @pytest.mark.parametrize(
     "sql",
     [

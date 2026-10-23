@@ -8,9 +8,9 @@ from app.core.config import SeedSettings
 from app.core.db.seeds.acuarius_app import seed_acuarius_application
 from app.core.db.seeds.admin import load_seed_config, seed_admin_user
 from app.core.db.seeds.leo_app import (
-    seed_leo_delegate_role,
     seed_leo_admin_role,
     seed_leo_application,
+    seed_leo_delegate_role,
     seed_leo_provisioner_role,
 )
 

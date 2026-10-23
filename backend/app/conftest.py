@@ -30,6 +30,7 @@ TEST_ENV = {
 os.environ.update(TEST_ENV)
 
 from collections.abc import AsyncGenerator, Callable
+from contextlib import asynccontextmanager
 
 import pytest
 import pytest_asyncio
@@ -49,6 +50,8 @@ from app.core.db.tests.conftest import TEST_URL, migrated  # noqa: F401
 os.environ["DATABASE_URL"] = TEST_URL
 get_settings.cache_clear()
 
+from app.core import runtime_settings
+from app.core.config import LegacyPolicyEnv
 from app.core.database import get_session
 from app.core.db.seeds.leo_app import (
     seed_leo_admin_role,
@@ -90,7 +93,23 @@ async def session(api_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
             join_transaction_mode="create_savepoint",
         )
         async with maker() as test_session:
-            yield test_session
+            # Los ajustes se leen/escriben en la sesion del test (misma
+            # transaccion, revertida al final), con los valores de TEST_ENV
+            # como valores iniciales (igual que el primer arranque real).
+            store = runtime_settings.store
+            original_factory = store.session_factory
+
+            @asynccontextmanager
+            async def shared_session() -> AsyncGenerator[AsyncSession]:
+                yield test_session
+
+            store.session_factory = shared_session
+            await store.sync_registry(LegacyPolicyEnv().initial_values())
+            try:
+                yield test_session
+            finally:
+                store.session_factory = original_factory
+                store.invalidate()
         await outer.rollback()
 
 

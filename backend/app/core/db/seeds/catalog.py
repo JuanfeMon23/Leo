@@ -97,6 +97,16 @@ LEO_MODULES: dict[str, tuple[str, dict[str, str]]] = {
             "export": "Exportar eventos de auditoria",
         },
     ),
+    "settings": (
+        "Ajustes",
+        {
+            "view": "Ver los ajustes del sistema y su historial de cambios",
+            "edit": "Editar los ajustes del sistema",
+            "edit-security": "Editar los ajustes de seguridad (bloqueo de login, "
+            "contrasenas, token de servicio)",
+            "update": "Evento: ajuste del sistema modificado",
+        },
+    ),
 }
 
 # tag -> nombre legible en espanol ("Verbo en infinitivo + objeto"; los eventos
@@ -135,6 +145,10 @@ LEO_ACTION_NAMES: dict[str, str] = {
     "leo.auth.service-token": "Evento: emisión de token de servicio",
     "leo.audit.view": "Consultar auditoría",
     "leo.audit.export": "Exportar auditoría",
+    "leo.settings.view": "Consultar ajustes",
+    "leo.settings.edit": "Editar ajustes",
+    "leo.settings.edit-security": "Editar ajustes de seguridad",
+    "leo.settings.update": "Evento: ajuste modificado",
 }
 
 

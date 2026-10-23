@@ -10,10 +10,12 @@ from dataclasses import dataclass
 from typing import Annotated, Any
 
 from fastapi import Depends, Query
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 from sqlalchemy import ColumnElement, Select, func, literal_column, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import runtime_settings
 from app.core.exceptions import not_found
 from app.core.schemas import Page
 
@@ -31,10 +33,25 @@ class Pagination:
         return (self.page - 1) * self.page_size
 
 
-def pagination_params(
+async def pagination_params(
     page: Annotated[int, Query(ge=1)] = 1,
-    page_size: Annotated[int, Query(ge=1, le=200)] = 20,
+    page_size: Annotated[int, Query(ge=1)] = 20,
 ) -> Pagination:
+    """`?page=&page_size=`; el maximo de `page_size` es el ajuste
+    `pagination.max_page_size` (leido en cada peticion)."""
+    maximum = await runtime_settings.get("pagination.max_page_size")
+    if page_size > maximum:
+        raise RequestValidationError(
+            [
+                {
+                    "type": "less_than_equal",
+                    "loc": ("query", "page_size"),
+                    "msg": f"Input should be less than or equal to {maximum}",
+                    "input": page_size,
+                    "ctx": {"le": maximum},
+                }
+            ]
+        )
     return Pagination(page=page, page_size=page_size)
 
 

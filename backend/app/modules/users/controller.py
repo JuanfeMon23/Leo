@@ -18,9 +18,8 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core import clock
+from app.core import clock, runtime_settings
 from app.core.audit import Actor, diff, snapshot
-from app.core.config import get_settings
 from app.core.exceptions import (
     AppError,
     ConflictError,
@@ -31,8 +30,8 @@ from app.core.exceptions import (
     not_found,
 )
 from app.core.pagination import Pagination, get_or_404, paginate
-from app.core.request_meta import RequestMeta
 from app.core.rate_limit import SlidingWindowLimiter, make_limiter
+from app.core.request_meta import RequestMeta
 from app.core.schemas import Page
 from app.core.security.passwords import (
     burn_verification_time,
@@ -210,8 +209,13 @@ async def get_user(session: AsyncSession, user_id: UUID) -> UserDetail:
     return await _detail(session, await get_or_404(session, User, user_id, _USER))
 
 
-def _check_password(password: str, username: str, email: str) -> None:
-    weaknesses = password_weaknesses(password, username=username, email=email)
+async def _check_password(password: str, username: str, email: str) -> None:
+    weaknesses = password_weaknesses(
+        password,
+        username=username,
+        email=email,
+        policy=await runtime_settings.password_policy(),
+    )
     if weaknesses:
         raise ValidationAppError(
             f"La contraseña es débil: {'; '.join(weaknesses)}.",
@@ -255,7 +259,7 @@ async def create_user(
     await _check_unique(
         session, email=data.email, document=(data.document_type, data.document_number)
     )
-    _check_password(data.password, data.username, data.email)
+    await _check_password(data.password, data.username, data.email)
     user = User(
         **data.model_dump(exclude={"password"}),
         password_hash=hash_password(data.password),
@@ -330,7 +334,7 @@ async def reset_password(
     session: AsyncSession, user_id: UUID, data: PasswordReset, actor: Actor
 ) -> UserRead:
     user = await get_or_404(session, User, user_id, _USER)
-    _check_password(data.password, user.username, user.email)
+    await _check_password(data.password, user.username, user.email)
     before = snapshot(user, USER_FIELDS)
     user.password_hash = hash_password(data.password)
     user.failed_login_attempts = 0
@@ -434,7 +438,7 @@ async def change_own_password(
         raise UnauthorizedError(
             "La contraseña actual no es correcta.", code="invalid_credentials"
         )
-    _check_password(new_password, user.username, user.email)
+    await _check_password(new_password, user.username, user.email)
     if verify_password(user.password_hash, new_password):
         raise ValidationAppError(
             "La contraseña nueva debe ser distinta de la actual.",
@@ -525,12 +529,11 @@ _provision_limiter: SlidingWindowLimiter | None = None
 
 
 def provision_limiter() -> SlidingWindowLimiter:
-    """Altas de pacientes por minuto y por app llamadora (en memoria)."""
+    """Altas de pacientes por ventana y por app llamadora; el limite y la
+    ventana se leen de `settings` en cada llamada."""
     global _provision_limiter
     if _provision_limiter is None:
-        _provision_limiter = make_limiter(
-            "provision", get_settings().leo_provision_rate_limit_per_minute, 60
-        )
+        _provision_limiter = make_limiter("provision")
     return _provision_limiter
 
 
@@ -566,13 +569,20 @@ async def provision_patient(
     no delate si choco. Audita con actor = servicio."""
     limiter = provision_limiter()
     key = str(principal.application_id)
-    wait = await limiter.check_and_hit(key)
+    values = await runtime_settings.get_many(
+        "rate_limit.provision_per_window", "rate_limit.window_seconds"
+    )
+    wait = await limiter.check_and_hit(
+        key,
+        limit=values["rate_limit.provision_per_window"],
+        window_seconds=values["rate_limit.window_seconds"],
+    )
     if wait:
         raise TooManyRequestsError(
             "Demasiadas solicitudes de alta. Intenta de nuevo más tarde.", wait
         )
 
-    _check_password(data.password, data.username, data.email)
+    await _check_password(data.password, data.username, data.email)
     password_hash = hash_password(data.password)
     role = await roles.active_role_brief(session, PATIENT_APP_SLUG, PATIENT_ROLE_SLUG)
     if role is None:

@@ -27,6 +27,10 @@ Python 3.13+, [uv](https://docs.astral.sh/uv/), Node.js con [pnpm](https://pnpm.
    pnpm run dev
    ```
 
+## Ajustes (backend)
+
+Las políticas (inactividad, vida de tokens y sesión, bloqueo de login, límites de intentos, contraseñas, paginación, export) ya NO son variables de entorno: se editan en la pantalla Ajustes (tabla `settings`, migración 0008). Ya no se usan `LEO_IDLE_TIMEOUT_MINUTES`, `LEO_ACCESS_TOKEN_MINUTES`, `LEO_SESSION_MAX_HOURS`, `LEO_LOGIN_*`, `LEO_SERVICE_TOKEN_*`, `LEO_PROVISION_*` ni `LEO_DELEGATED_*`; si siguen definidas, solo se leen en el primer arranque como valor inicial de la clave que aún no existe. El backend depende de `sdk/python` por ruta local (`uv sync` en `backend/`).
+
 ## Producción (backend)
 
 Endurecimientos opcionales por variable de entorno (ver `backend/.env.example`); los valores por defecto sirven para desarrollo.

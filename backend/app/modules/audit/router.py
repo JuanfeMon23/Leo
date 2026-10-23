@@ -78,7 +78,7 @@ async def list_events(
         200: {"content": {"text/csv": {}}, "description": "CSV (UTF-8)."},
         **error_responses(*AUTH_ERRORS),
     },
-    summary=f"Exportar eventos a CSV (máximo {controller.EXPORT_MAX_ROWS} filas)",
+    summary="Exportar eventos a CSV (máximo: ajuste audit.export_max_rows)",
 )
 async def export_events(
     session: SessionDep,

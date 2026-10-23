@@ -13,7 +13,6 @@ from app.core import clock
 from app.core.crypto import sha256_hex
 from app.core.tests.dpop_keys import DpopKey
 from app.modules.audit.models import AuditEvent
-from app.modules.auth import service_token_limiter
 from app.modules.auth.models import ServiceToken
 from app.testkit import (
     COOKIE,
@@ -21,6 +20,7 @@ from app.testkit import (
     make_client_app,
     make_role,
     make_user,
+    set_setting,
 )
 
 TOKEN = "/api/v1/auth/token"
@@ -137,15 +137,14 @@ async def test_emision_auditada_sin_el_token(svc: Services):
     assert not any("token" in key or "hash" in key for key in event.changes)
 
 
-async def test_la_vida_es_configurable_con_tope_de_una_hora(svc: Services, monkeypatch):
-    from pydantic import ValidationError
+async def test_la_vida_es_configurable_con_tope_de_una_hora(svc: Services, session):
+    from app.core.runtime_settings import LEO_SETTINGS
 
-    from app.core.config import Settings, get_settings
-
-    monkeypatch.setattr(get_settings(), "leo_service_token_minutes", 60)
+    await set_setting(session, "auth.service_token_minutes", 60)
     assert (await svc.issue()).json()["expires_in"] == 3600
-    with pytest.raises(ValidationError):
-        Settings(leo_service_token_minutes=61)
+    await set_setting(session, "auth.service_token_minutes", 3)
+    assert (await svc.issue()).json()["expires_in"] == 180
+    assert LEO_SETTINGS.get("auth.service_token_minutes").max == 60
 
 
 async def test_sin_concesion_se_deniega_y_se_audita(svc: Services, session):
@@ -244,10 +243,10 @@ async def test_no_acepta_campos_extra_ni_jkt(svc: Services):
     assert response.status_code == 422
 
 
-async def test_rate_limit_por_cliente(svc: Services, monkeypatch, session):
-    monkeypatch.setattr(service_token_limiter(), "limit", 2)
-    assert (await svc.issue()).status_code == 200
-    assert (await svc.issue()).status_code == 200
+async def test_rate_limit_por_cliente(svc: Services, session):
+    await set_setting(session, "rate_limit.service_token_per_window", 5)
+    for _ in range(5):
+        assert (await svc.issue()).status_code == 200
     third = await svc.issue()
     assert third.status_code == 429
     assert third.json()["code"] == "too_many_attempts"
