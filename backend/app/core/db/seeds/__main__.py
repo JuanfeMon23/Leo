@@ -7,6 +7,7 @@ import sys
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine
 
+import app.main  # noqa: F401  (orden de importacion de modulos: evita el ciclo users/auth)
 from app.core.config import SeedSettings, get_settings
 from app.core.db.seeds.admin import SeedConfigError
 from app.core.db.seeds.runner import run_seeds
