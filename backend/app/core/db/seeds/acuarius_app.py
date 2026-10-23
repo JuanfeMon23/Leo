@@ -26,7 +26,7 @@ ACUARIUS_APP_SLUG = "acuarius"
 ACUARIUS_APP_NAME = "Acuarius"
 ACUARIUS_APP_DESCRIPTION = "Portal de pacientes: resultados y grupo familiar."
 ACUARIUS_BASE_URL = "http://localhost:3300"
-ACUARIUS_REDIRECT_URIS = ["http://localhost:3300/auth/callback"]
+ACUARIUS_REDIRECT_URIS = ["http://localhost:3300/leo/callback"]
 PATIENT_ROLE_SLUG = "paciente"
 PATIENT_ROLE_NAME = "Paciente"
 

@@ -124,7 +124,7 @@ async def test_semilla_acuarius_y_rol_paciente(world):
     ).one()
     assert app.client_id == "acuarius"
     assert app.base_url == "http://localhost:3300"
-    assert app.redirect_uris == ["http://localhost:3300/auth/callback"]
+    assert app.redirect_uris == ["http://localhost:3300/leo/callback"]
     role = (
         await session.scalars(
             select(Role).where(Role.application_id == app.id, Role.slug == "paciente")
