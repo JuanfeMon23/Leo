@@ -13,6 +13,20 @@ export const profileSchema = z.object({
 
 export type ProfileInput = z.input<typeof profileSchema>
 
+/**
+ * Formulario de datos personales: `profileSchema` + «Contraseña actual», obligatoria
+ * solo si el correo cambió respecto al actual (`currentEmail` se lee al validar).
+ * El backend sigue siendo la autoridad (`current_password_required`).
+ */
+export function profileFormSchema(currentEmail: () => string) {
+  return profileSchema.extend({ current_password: z.string().optional() }).superRefine((v, issue) => {
+    const next = (v.email ?? '').trim()
+    if (next && next !== currentEmail() && !v.current_password) {
+      issue.addIssue({ code: 'custom', path: ['current_password'], message: 'Ingresa tu contraseña actual para cambiar el correo.' })
+    }
+  })
+}
+
 const requiredPassword = (message: string) =>
   z.string({ required_error: message }).min(1, message)
 

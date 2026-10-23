@@ -7,6 +7,10 @@
   un access token valido de esa app (lo usa la ingesta de auditoria).
 - `revoke_user_sessions(session, user_id, reason, except_session_id=None)`:
   revoca todas las sesiones de un usuario salvo una (sin commit).
+- `delegated_update_profile(...)` / `delegated_change_password(...)`:
+  autogestion en nombre del usuario por una app de servicio con su access token
+  (las expone `users` en `/users/service/delegated/*`; misma logica que la
+  de la cookie).
 - `login_limiters()`: limitadores del login (los tests los reinician).
 - `service_token_limiter()`: limitador de emision de tokens de servicio.
 - `resolve_service_principal(session, token)`: hook de `core.service_authz`
@@ -16,6 +20,8 @@
 """
 
 from app.modules.auth.controller import (
+    delegated_change_password,
+    delegated_update_profile,
     login_limiters,
     resolve_access_token,
     resolve_service_principal,
@@ -28,6 +34,8 @@ from app.modules.auth.router import router as auth_router
 
 __all__ = [
     "auth_router",
+    "delegated_change_password",
+    "delegated_update_profile",
     "login_limiters",
     "resolve_access_token",
     "resolve_principal",

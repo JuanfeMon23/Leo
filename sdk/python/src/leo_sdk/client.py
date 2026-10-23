@@ -9,8 +9,8 @@ from uuid import UUID
 
 import httpx
 
-from leo_sdk.errors import LeoUnavailableError, error_from_response
-from leo_sdk.models import Introspection, ServiceToken, TokenSet
+from leo_sdk.errors import InvalidTokenError, LeoUnavailableError, error_from_response
+from leo_sdk.models import Introspection, ServiceToken, TokenSet, UserProfile
 from leo_sdk.settings import LeoSettings
 
 
@@ -27,17 +27,29 @@ class LeoClient:
         self._auth = httpx.BasicAuth(
             settings.app_client_id, settings.app_client_secret.get_secret_value()
         )
+        self._service_tokens: Any = None  # ServiceTokenProvider, perezoso
 
     async def aclose(self) -> None:
         if self._owns_http:
             await self._http.aclose()
 
     async def _request(
-        self, method: str, path: str, *, json: Any = None
+        self,
+        method: str,
+        path: str,
+        *,
+        json: Any = None,
+        bearer: str | None = None,
     ) -> httpx.Response:
+        """Con `bearer` la llamada va con `Authorization: Bearer` (token de
+        servicio) en vez de HTTP Basic."""
         try:
             response = await self._http.request(
-                method, f"{self._base}{path}", json=json, auth=self._auth
+                method,
+                f"{self._base}{path}",
+                json=json,
+                auth=self._auth if bearer is None else None,
+                headers={"Authorization": f"Bearer {bearer}"} if bearer else None,
             )
         except httpx.HTTPError as exc:  # red, timeout, DNS...
             raise LeoUnavailableError(details=type(exc).__name__) from exc
@@ -119,3 +131,66 @@ class LeoClient:
     async def ingest_audit(self, payload: dict[str, Any]) -> UUID:
         response = await self._request("POST", "/audit/events", json=payload)
         return UUID(response.json()["id"])
+
+    async def _as_service(
+        self, method: str, path: str, body: dict[str, Any]
+    ) -> httpx.Response:
+        """Llamada a Leo con token de servicio (audiencia `leo`, cacheado). Un
+        401 del token de SERVICIO renueva el token y reintenta una vez; el 401
+        por el token del usuario no se reintenta (`InvalidTokenError`)."""
+        if self._service_tokens is None:
+            from leo_sdk.service import ServiceTokenProvider  # evita el ciclo
+
+            self._service_tokens = ServiceTokenProvider(self)
+        token = await self._service_tokens.token("leo")
+        try:
+            return await self._request(method, path, json=body, bearer=token)
+        except InvalidTokenError as exc:
+            if exc.is_user_token:
+                raise
+            token = await self._service_tokens.token("leo", stale=token)
+            return await self._request(method, path, json=body, bearer=token)
+
+    async def update_user_profile(
+        self,
+        user_access_token: str,
+        first_name: str | None = None,
+        last_name: str | None = None,
+        email: str | None = None,
+        current_password: str | None = None,
+    ) -> UserProfile:
+        """Edita nombres/correo del usuario dueno de `user_access_token` (el
+        access token que Leo emitio a ESTA app). Requiere el rol de servicio
+        `leo-self-service-delegate` y un usuario sin permisos `leo.*`. Cambiar
+        a otro correo exige `current_password` (422 `current_password_required`,
+        403 `invalid_current_password`, 429 `TooManyAttemptsError`, 409
+        `duplicate`). Solo se envian los campos que no son None."""
+        body: dict[str, Any] = {"user_access_token": user_access_token}
+        for name, value in (
+            ("first_name", first_name),
+            ("last_name", last_name),
+            ("email", email),
+            ("current_password", current_password),
+        ):
+            if value is not None:
+                body[name] = value
+        response = await self._as_service(
+            "PATCH", "/users/service/delegated/profile", body
+        )
+        return UserProfile.model_validate(response.json())
+
+    async def change_user_password(
+        self, user_access_token: str, current_password: str, new_password: str
+    ) -> None:
+        """Cambia la contrasena del usuario dueno de `user_access_token`; Leo
+        cierra sus demas sesiones. Errores: 401 `invalid_credentials`, 422
+        `weak_password`/`same_password`, 429 `TooManyAttemptsError`."""
+        await self._as_service(
+            "POST",
+            "/users/service/delegated/password",
+            {
+                "user_access_token": user_access_token,
+                "current_password": current_password,
+                "new_password": new_password,
+            },
+        )

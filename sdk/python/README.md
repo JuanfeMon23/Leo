@@ -61,6 +61,18 @@ await http.get("/things")  # Bearer automatico; ante 401 renueva el token y rein
 
 El token se cachea en memoria hasta ~30 s antes de vencer (`margin_seconds`) con un solo canje concurrente por audiencia. Errores: `ServiceAccessDenied` (sin concesión), `InvalidTargetError` (audiencia inexistente), `TooManyAttemptsError` (`retry_after`), `InvalidClientError`, `LeoUnavailableError`.
 
+## Editar el perfil o la contraseña de un usuario desde tu BFF
+
+Requisito: un admin de Leo concede a tu app el rol de servicio `leo-self-service-delegate` (`leo.users.delegated-self-manage`). Solo sirve para usuarios sin permisos ni roles de Leo (p. ej. pacientes) y con el access token que Leo emitió a TU app.
+
+```python
+client = LeoClient(LeoSettings())
+profile = await client.update_user_profile(user_access_token, first_name="Laura", email="n@x.com", current_password="...")
+await client.change_user_password(user_access_token, current_password="...", new_password="...")
+```
+
+`current_password` es obligatoria para cambiar de correo y para cambiar la contraseña. Errores (`LeoError` con `code`): `invalid_token` (`InvalidTokenError`; `.is_user_token` si falla el token del usuario, no se reintenta), `forbidden`, `current_password_required`, `invalid_current_password`, `invalid_credentials`, `weak_password`, `same_password`, `duplicate`, `too_many_attempts` (`TooManyAttemptsError.retry_after`). Un 401 del token de servicio renueva el token y reintenta una vez.
+
 ## Aceptar llamadas de otras apps
 
 `auth.current_user` y `auth.require_action(...)` aceptan además `Authorization: Bearer <token de servicio>` (sin cookie ni DPoP): el principal trae `principal_type == "service"`, `client_id` (la app llamadora), `permissions` y `session_id = None`. Un Bearer inválido da 401 `not_authenticated`; nunca cae a la cookie. Para endpoints solo de personas usa `Depends(auth.current_person)` (un servicio recibe 403 `user_required`); `/auth/me`, `/auth/activity` y `/auth/logout` ya lo exigen.

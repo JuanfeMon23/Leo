@@ -76,6 +76,7 @@ describe('ProfilePersonalForm', () => {
     api.mockRejectedValue(new LeoApiError(409, 'duplicate', 'Ya existe un usuario con el email «b@x.co».', { email: 'b@x.co' }))
     const w = await mountSuspended(ProfilePersonalForm)
     await inputs(w)[2]!.setValue('b@x.co')
+    await w.get('input[autocomplete="current-password"]').setValue('Secreta-123')
     await submit(w)
     await vi.waitFor(() => expect(w.text()).toContain('Ya existe un usuario con el email'))
     expect(w.find('[data-testid="profile-error"]').exists()).toBe(false)
@@ -89,5 +90,67 @@ describe('ProfilePersonalForm', () => {
     await submit(w)
     await vi.waitFor(() => expect(w.find('[data-testid="profile-error"]').exists()).toBe(true))
     expect(w.text()).not.toMatch(/failed to fetch/i)
+  })
+
+  describe('cambio de correo', () => {
+    const pwd = (w: Wrapper) => w.find('input[autocomplete="current-password"]')
+
+    it('el campo «Contraseña actual» solo aparece si el correo cambia', async () => {
+      const w = await mountSuspended(ProfilePersonalForm)
+      expect(pwd(w).exists()).toBe(false)
+      await inputs(w)[2]!.setValue('nuevo@x.co')
+      expect(pwd(w).exists()).toBe(true)
+      await inputs(w)[2]!.setValue('a@x.co')
+      expect(pwd(w).exists()).toBe(false)
+    })
+
+    it('sin contraseña actual: error en el campo y no llama a la API', async () => {
+      const w = await mountSuspended(ProfilePersonalForm)
+      await inputs(w)[2]!.setValue('nuevo@x.co')
+      await submit(w)
+      await vi.waitFor(() => expect(w.text()).toContain('Ingresa tu contraseña actual'))
+      expect(api).not.toHaveBeenCalled()
+    })
+
+    it('envía current_password con el correo y limpia el campo al guardar', async () => {
+      api.mockResolvedValue(ME('Ana', 'Pérez', 'nuevo@x.co'))
+      const w = await mountSuspended(ProfilePersonalForm)
+      await inputs(w)[2]!.setValue('nuevo@x.co')
+      await pwd(w).setValue('Secreta-123')
+      await submit(w)
+      await vi.waitFor(() => expect(api).toHaveBeenCalled())
+      expect(api).toHaveBeenCalledWith('/auth/me/profile', { method: 'PATCH', body: { email: 'nuevo@x.co', current_password: 'Secreta-123' } })
+      await flushPromises()
+      expect(pwd(w).exists()).toBe(false)
+    })
+
+    it('sin cambiar el correo no manda current_password', async () => {
+      api.mockResolvedValue(ME('Ana María'))
+      const w = await mountSuspended(ProfilePersonalForm)
+      await inputs(w)[0]!.setValue('Ana María')
+      await submit(w)
+      await vi.waitFor(() => expect(api).toHaveBeenCalled())
+      expect(api.mock.calls[0]![1].body).not.toHaveProperty('current_password')
+    })
+
+    it('invalid_current_password (403): mensaje legible en el campo y se vacía', async () => {
+      api.mockRejectedValue(new LeoApiError(403, 'invalid_current_password', 'raw backend'))
+      const w = await mountSuspended(ProfilePersonalForm)
+      await inputs(w)[2]!.setValue('nuevo@x.co')
+      await pwd(w).setValue('mala')
+      await submit(w)
+      await vi.waitFor(() => expect(w.text()).toContain('La contraseña actual no es correcta.'))
+      expect(w.text()).not.toContain('raw backend')
+      expect((pwd(w).element as HTMLInputElement).value).toBe('')
+    })
+
+    it('current_password_required (422): mensaje en el campo', async () => {
+      api.mockRejectedValue(new LeoApiError(422, 'current_password_required', 'raw'))
+      const w = await mountSuspended(ProfilePersonalForm)
+      await inputs(w)[2]!.setValue('nuevo@x.co')
+      await pwd(w).setValue('x')
+      await submit(w)
+      await vi.waitFor(() => expect(w.text()).toContain('Ingresa tu contraseña actual'))
+    })
   })
 })

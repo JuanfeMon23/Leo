@@ -103,9 +103,9 @@ def require_action(tag: str) -> Any:
             return principal
         if _config.on_denied is not None:
             await _config.on_denied(session, principal, tag, meta)
-        raise ForbiddenError(
-            "No tienes permiso para realizar esta acción.", {"action_tag": tag}
-        )
+        # Sin `details`: no revela a quien no lo tiene el nombre del permiso
+        # (el tag va a la auditoria `denied`, no a la respuesta).
+        raise ForbiddenError("No tienes permiso para realizar esta acción.")
 
     dependency.__name__ = f"require_{tag.replace('.', '_').replace('-', '_')}"
     return Depends(dependency)

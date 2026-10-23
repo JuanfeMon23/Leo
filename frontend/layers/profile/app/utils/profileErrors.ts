@@ -45,3 +45,15 @@ export function profilePasswordErrors(err: unknown): ProfilePasswordErrors {
   }
   return { fields: {}, form: leoErrorMessage(err) }
 }
+
+/**
+ * Errores de `PATCH /auth/me/profile` que van al campo «contraseña actual»:
+ * `current_password_required` (422) e `invalid_current_password` (403, mensaje genérico).
+ * Devuelve `null` si es otro error (correo repetido, red…): lo resuelve el mapeo general.
+ */
+export function profileUpdateFieldError(err: unknown): string | null {
+  if (!(err instanceof LeoApiError)) return null
+  if (err.code === 'current_password_required') return 'Ingresa tu contraseña actual para cambiar el correo.'
+  if (err.code === 'invalid_current_password') return 'La contraseña actual no es correcta.'
+  return null
+}

@@ -2,11 +2,9 @@
 `request_id` (header `X-Request-ID` del cliente si es valido, si no uno
 nuevo; se devuelve en la respuesta).
 
-Pendiente: detras de un proxy, la ip real vendria de `X-Forwarded-For`
-(solo si el proxy es de confianza); hoy se usa la ip del socket.
+La ip sale de `app.core.client_ip.client_ip` (respeta `LEO_TRUSTED_PROXIES`).
 """
 
-import ipaddress
 import re
 from dataclasses import dataclass
 from typing import Annotated
@@ -14,6 +12,8 @@ from uuid import uuid4
 
 from fastapi import Depends, Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+from app.core.client_ip import client_ip
 
 REQUEST_ID_HEADER = "X-Request-ID"
 _REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
@@ -27,17 +27,10 @@ class RequestMeta:
     request_id: str | None
 
 
-def _valid_ip(host: str | None) -> str | None:
-    try:
-        return str(ipaddress.ip_address(host)) if host else None
-    except ValueError:
-        return None
-
-
 def request_meta(request: Request) -> RequestMeta:
     agent = request.headers.get("user-agent")
     return RequestMeta(
-        ip=_valid_ip(request.client.host if request.client else None),
+        ip=client_ip(request),
         user_agent=agent[:USER_AGENT_MAX_LENGTH] if agent else None,
         request_id=getattr(request.state, "request_id", None),
     )

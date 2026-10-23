@@ -3,17 +3,21 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Response, status
 
 from app.core.audit import Actor
 from app.core.authz import require_action, require_actor
 from app.core.database import SessionDep
+from app.core.request_meta import Meta
 from app.core.pagination import ActiveQuery, PaginationDep, SearchQuery
 from app.core.schemas import AUTH_ERRORS, Page, error_responses
 from app.core.service_authz import ServiceCaller, require_service_actor
 from app.modules.users import controller
-from app.modules.users.controller import PROVISION_TAG
+from app.modules.users.controller import DELEGATED_TAG, PROVISION_TAG
 from app.modules.users.schemas import (
+    DelegatedPasswordChange,
+    DelegatedProfileRead,
+    DelegatedProfileUpdate,
     PasswordReset,
     PatientProvision,
     PatientRead,
@@ -78,6 +82,56 @@ async def provision_patient(
 ) -> PatientRead:
     principal, actor = caller
     return await controller.provision_patient(session, data, principal, actor)
+
+
+@router.patch(
+    "/service/delegated/profile",
+    response_model=DelegatedProfileRead,
+    responses=error_responses(401, 403, 409, 422, 429),
+    summary="Editar el perfil de un usuario en su nombre (solo apps con servicio)",
+    description="Autenticación: `Authorization: Bearer <token de servicio>` "
+    "(`client_credentials`, `audience=leo`) de una app con el rol "
+    "`leo-self-service-delegate` (`leo.users.delegated-self-manage`). El "
+    "usuario objetivo sale de `user_access_token` (access token que Leo "
+    "emitió al usuario para ESA app; vigente, sesión viva); nunca se acepta un "
+    "id (422). Solo cuentas SIN permisos ni roles de Leo (403 genérico si no). "
+    "Mismas reglas que `PATCH /auth/me/profile`: otro correo exige "
+    "`current_password` (422 `current_password_required`, 403 "
+    "`invalid_current_password`, 429 `too_many_attempts`), 409 `duplicate`, "
+    "cierra las demás sesiones al cambiar el correo. Token de usuario "
+    "inválido: 401 `invalid_token` (`details.field=user_access_token`).",
+)
+async def delegated_update_profile(
+    session: SessionDep,
+    data: DelegatedProfileUpdate,
+    caller: Annotated[ServiceCaller, require_service_actor(DELEGATED_TAG)],
+    meta: Meta,
+) -> DelegatedProfileRead:
+    principal, _actor = caller
+    return await controller.delegated_update_profile(session, principal, data, meta)
+
+
+@router.post(
+    "/service/delegated/password",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(401, 403, 422, 429),
+    summary="Cambiar la contraseña de un usuario en su nombre (solo apps con servicio)",
+    description="Misma autenticación y restricciones que "
+    "`PATCH /users/service/delegated/profile`. Mismas reglas que `POST "
+    "/auth/me/password`: exige la contraseña actual (401 `invalid_credentials`), "
+    "política de contraseñas (422 `weak_password`, `same_password`), 429 "
+    "`too_many_attempts` con bloqueo compartido, y cierra las demás sesiones "
+    "del usuario (la del token se mantiene).",
+)
+async def delegated_change_password(
+    session: SessionDep,
+    data: DelegatedPasswordChange,
+    caller: Annotated[ServiceCaller, require_service_actor(DELEGATED_TAG)],
+    meta: Meta,
+) -> Response:
+    principal, _actor = caller
+    await controller.delegated_change_password(session, principal, data, meta)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(

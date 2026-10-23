@@ -79,6 +79,7 @@ async def test_edita_nombres_y_correo_sin_permisos_leo(session, make_browser):
             "first_name": "  Beatriz ",
             "last_name": "Pérez",
             "email": "Nuevo.Correo@Example.com",
+            "current_password": STRONG_PASSWORD,
         },
     )
 
@@ -186,7 +187,9 @@ async def test_correo_duplicado_sin_distinguir_mayusculas(session, make_browser)
     nav = await user_nav(session, make_browser)
 
     for email in ("ocupado@example.com", "OCUPADO@Example.COM"):
-        response = await nav.patch(PROFILE, json={"email": email})
+        response = await nav.patch(
+            PROFILE, json={"email": email, "current_password": STRONG_PASSWORD}
+        )
         assert response.status_code == 409, response.text
         body = response.json()
         assert body["code"] == "duplicate"
@@ -472,3 +475,165 @@ async def test_contrasena_rechaza_campos_extra_y_faltantes(session, make_browser
     ]:
         response = await nav.post(PASSWORD, json=payload)
         assert response.status_code == 422, (payload, response.text)
+
+
+# --- PATCH /auth/me/profile: cambio de correo exige la contrasena actual ---
+
+WRONG = "Incorrecta-123!"
+
+
+def email_body(email="nuevo@example.com", **extra):
+    return {"email": email, **extra}
+
+
+async def test_cambiar_correo_sin_contrasena_422_y_no_cambia(session, make_browser):
+    nav = await user_nav(session, make_browser)
+
+    response = await nav.patch(PROFILE, json=email_body())
+
+    assert response.status_code == 422, response.text
+    body = response.json()
+    assert body["code"] == "current_password_required"
+    assert body["message"] and body["details"] == {"field": "current_password"}
+    assert (await reload(session, nav.user)).email == nav.user.email
+
+
+async def test_cambiar_correo_con_contrasena_incorrecta_403_generico(
+    session, make_browser
+):
+    nav = await user_nav(session, make_browser)
+
+    response = await nav.patch(PROFILE, json=email_body(current_password=WRONG))
+
+    assert response.status_code == 403, response.text
+    assert response.json()["code"] == "invalid_current_password"
+    assert WRONG not in response.text and STRONG_PASSWORD not in response.text
+    assert (await reload(session, nav.user)).email == nav.user.email
+    assert (await nav.get(ME)).status_code == 200  # la sesion sigue viva
+    [event] = await events(session, "leo.users.edit", result="denied")
+    assert event.actor_user_id == nav.user.id
+    assert WRONG not in json.dumps(event.changes) + (event.reason or "")
+
+
+async def test_correo_con_contrasena_correcta_cambia_y_audita_before_after(
+    session, make_browser
+):
+    nav = await user_nav(session, make_browser, email="vieja@example.com")
+
+    response = await nav.patch(
+        PROFILE, json=email_body("nueva@example.com", current_password=STRONG_PASSWORD)
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["user"]["email"] == "nueva@example.com"
+    [event] = await events(
+        session, "leo.users.edit", entity_id=str(nav.user.id), result="ok"
+    )
+    assert event.changes == {
+        "email": {"before": "vieja@example.com", "after": "nueva@example.com"}
+    }
+    assert STRONG_PASSWORD not in json.dumps(event.changes) + (event.reason or "")
+
+
+async def test_cambiar_correo_cierra_las_otras_sesiones(session, make_browser):
+    user = await make_user(session)
+    current = await login_as(session, make_browser, user)
+    other = await login_as(session, make_browser, user)
+
+    response = await current.patch(
+        PROFILE, json=email_body(current_password=STRONG_PASSWORD)
+    )
+
+    assert response.status_code == 200, response.text
+    assert (await current.get(ME)).status_code == 200
+    assert (await other.get(ME)).status_code == 401
+    reasons = [
+        s.revoked_reason
+        for s in await session.scalars(
+            select(Session)
+            .where(Session.user_id == user.id, Session.revoked_at.is_not(None))
+            .execution_options(populate_existing=True)
+        )
+    ]
+    assert reasons == ["email-change"]
+
+
+async def test_solo_nombres_no_exige_contrasena_ni_cierra_sesiones(
+    session, make_browser
+):
+    user = await make_user(session)
+    current = await login_as(session, make_browser, user)
+    other = await login_as(session, make_browser, user)
+
+    response = await current.patch(PROFILE, json={"first_name": "Nuevo"})
+
+    assert response.status_code == 200, response.text
+    assert (await other.get(ME)).status_code == 200
+
+
+async def test_contrasena_sin_cambio_de_correo_se_ignora(session, make_browser):
+    nav = await user_nav(session, make_browser, first_name="Ana")
+
+    same = await nav.patch(
+        PROFILE, json={"email": nav.user.email, "current_password": WRONG}
+    )
+    names = await nav.patch(
+        PROFILE, json={"first_name": "Zoe", "current_password": WRONG}
+    )
+
+    assert same.status_code == 200 and names.status_code == 200
+    assert await events(session, "leo.users.edit", result="denied") == []
+    assert [e.changes for e in await events(session, "leo.users.edit")] == [
+        {"first_name": {"before": "Ana", "after": "Zoe"}}
+    ]
+
+
+async def test_contrasena_actual_vacia_o_no_texto_es_422(session, make_browser):
+    nav = await user_nav(session, make_browser)
+
+    for value in ("", 123):
+        response = await nav.patch(PROFILE, json=email_body(current_password=value))
+        assert response.status_code == 422, response.text
+        assert response.json()["code"] == "validation_error"
+
+
+async def test_intentos_fallidos_de_correo_bloquean_429_incluso_la_correcta(
+    session, make_browser
+):
+    nav = await user_nav(session, make_browser)
+    bad = email_body(current_password=WRONG)
+
+    for _ in range(5):  # LEO_LOGIN_MAX_FAILED_ATTEMPTS en los tests
+        assert (await nav.patch(PROFILE, json=bad)).status_code == 403
+    blocked = await nav.patch(PROFILE, json=email_body(current_password=STRONG_PASSWORD))
+
+    assert blocked.status_code == 429
+    assert blocked.json()["code"] == "too_many_attempts"
+    assert int(blocked.headers["Retry-After"]) >= 1
+    assert (await reload(session, nav.user)).email == nav.user.email
+
+
+async def test_fallos_de_correo_comparten_bloqueo_con_cambio_de_contrasena(
+    session, make_browser
+):
+    nav = await user_nav(session, make_browser)
+
+    for _ in range(5):
+        response = await nav.patch(PROFILE, json=email_body(current_password=WRONG))
+        assert response.status_code == 403
+    blocked = await nav.post(PASSWORD, json=passwords())
+
+    assert blocked.status_code == 429
+
+
+async def test_correo_ocupado_con_contrasena_incorrecta_no_revela_existencia(
+    session, make_browser
+):
+    await make_user(session, email="ocupado@example.com")
+    nav = await user_nav(session, make_browser)
+
+    response = await nav.patch(
+        PROFILE, json=email_body("ocupado@example.com", current_password=WRONG)
+    )
+
+    assert response.status_code == 403  # no 409: la contrasena se verifica antes

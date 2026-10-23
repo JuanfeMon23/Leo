@@ -53,7 +53,7 @@ from app.core.exceptions import (
     not_found,
 )
 from app.core.pagination import Pagination, paginate
-from app.core.rate_limit import SlidingWindowLimiter
+from app.core.rate_limit import SlidingWindowLimiter, make_limiter
 from app.core.request_meta import RequestMeta
 from app.core.schemas import Page
 from app.core.service_authz import ServicePrincipal
@@ -92,6 +92,12 @@ TOO_MANY_ATTEMPTS = (
 TOO_MANY_PASSWORD_ATTEMPTS = (
     "Demasiados intentos de cambio de contraseña. Intenta de nuevo más tarde."
 )
+TOO_MANY_PROFILE_ATTEMPTS = (
+    "Demasiados intentos de verificación de contraseña. Intenta de nuevo más tarde."
+)
+TOO_MANY_DELEGATED = "Demasiadas solicitudes. Intenta de nuevo más tarde."
+CURRENT_PASSWORD_REQUIRED = "Para cambiar tu correo escribe tu contraseña actual."
+INVALID_CURRENT_PASSWORD = "La contraseña actual no es correcta."
 SESSION_EXPIRED = "Tu sesión expiró. Inicia sesión de nuevo."
 IDLE_EXPIRED = "Tu sesión se cerró por inactividad. Inicia sesión de nuevo."
 INVALID_GRANT = (
@@ -99,7 +105,8 @@ INVALID_GRANT = (
 )
 
 
-# --- limitadores del login (en memoria del proceso; ver core.rate_limit) ---
+# --- limitadores del login (almacen segun LEO_RATE_LIMIT_BACKEND; ver
+# core.rate_limit) ---
 
 
 @dataclass
@@ -114,8 +121,12 @@ class LoginLimiters:
     password_by_ip: SlidingWindowLimiter
     password_by_user: SlidingWindowLimiter
     password_failures: SlidingWindowLimiter
+    # Autogestion delegada (una app actua con el token del usuario): llamadas
+    # por minuto por app llamadora y por usuario.
+    delegated_by_app: SlidingWindowLimiter
+    delegated_by_user: SlidingWindowLimiter
 
-    def reset(self) -> None:
+    async def reset(self) -> None:
         for limiter in (
             self.by_ip,
             self.by_login,
@@ -123,8 +134,10 @@ class LoginLimiters:
             self.password_by_ip,
             self.password_by_user,
             self.password_failures,
+            self.delegated_by_app,
+            self.delegated_by_user,
         ):
-            limiter.reset()
+            await limiter.reset()
 
 
 _limiters: LoginLimiters | None = None
@@ -134,18 +147,27 @@ def login_limiters() -> LoginLimiters:
     global _limiters
     if _limiters is None:
         s = get_settings()
+        lock = s.leo_login_lock_minutes * 60
         _limiters = LoginLimiters(
-            by_ip=SlidingWindowLimiter(s.leo_login_rate_limit_per_minute, 60),
-            by_login=SlidingWindowLimiter(s.leo_login_rate_limit_per_minute, 60),
-            unknown_failures=SlidingWindowLimiter(
-                s.leo_login_max_failed_attempts, s.leo_login_lock_minutes * 60
+            by_ip=make_limiter("login.ip", s.leo_login_rate_limit_per_minute, 60),
+            by_login=make_limiter("login.user", s.leo_login_rate_limit_per_minute, 60),
+            unknown_failures=make_limiter(
+                "login.unknown", s.leo_login_max_failed_attempts, lock
             ),
-            password_by_ip=SlidingWindowLimiter(s.leo_login_rate_limit_per_minute, 60),
-            password_by_user=SlidingWindowLimiter(
-                s.leo_login_rate_limit_per_minute, 60
+            password_by_ip=make_limiter(
+                "password.ip", s.leo_login_rate_limit_per_minute, 60
             ),
-            password_failures=SlidingWindowLimiter(
-                s.leo_login_max_failed_attempts, s.leo_login_lock_minutes * 60
+            password_by_user=make_limiter(
+                "password.user", s.leo_login_rate_limit_per_minute, 60
+            ),
+            password_failures=make_limiter(
+                "password.failures", s.leo_login_max_failed_attempts, lock
+            ),
+            delegated_by_app=make_limiter(
+                "delegated.app", s.leo_delegated_rate_limit_per_minute, 60
+            ),
+            delegated_by_user=make_limiter(
+                "delegated.user", s.leo_login_rate_limit_per_minute, 60
             ),
         )
     return _limiters
@@ -155,11 +177,11 @@ _service_limiter: SlidingWindowLimiter | None = None
 
 
 def service_token_limiter() -> SlidingWindowLimiter:
-    """Emisiones de tokens de servicio por minuto y por cliente (en memoria)."""
+    """Emisiones de tokens de servicio por minuto y por cliente."""
     global _service_limiter
     if _service_limiter is None:
-        _service_limiter = SlidingWindowLimiter(
-            get_settings().leo_service_token_rate_limit_per_minute, 60
+        _service_limiter = make_limiter(
+            "service-token", get_settings().leo_service_token_rate_limit_per_minute, 60
         )
     return _service_limiter
 
@@ -243,16 +265,14 @@ async def login(
     ip_key = meta.ip or "desconocida"
     now = clock.now()
 
-    wait = max(
-        limiters.by_ip.retry_after(ip_key, now),
-        limiters.by_login.retry_after(login_key, now),
-    )
+    # check_and_hit: atomico (sin carreras entre peticiones concurrentes).
+    wait = await limiters.by_ip.check_and_hit(ip_key, now)
+    if not wait:
+        wait = await limiters.by_login.check_and_hit(login_key, now)
     if wait:
         raise TooManyRequestsError(TOO_MANY_ATTEMPTS, wait)
-    limiters.by_ip.hit(ip_key, now)
-    limiters.by_login.hit(login_key, now)
 
-    wait = limiters.unknown_failures.retry_after(login_key, now)
+    wait = await limiters.unknown_failures.retry_after(login_key, now)
     if wait:
         raise TooManyRequestsError(TOO_MANY_ATTEMPTS, wait)
 
@@ -276,7 +296,7 @@ async def login(
     outcome = check.outcome
     if outcome == users.LoginOutcome.INVALID:
         if check.user is None:
-            limiters.unknown_failures.hit(login_key, now)
+            await limiters.unknown_failures.hit(login_key, now)
         base.result, base.reason = "denied", "Credenciales incorrectas."
         await audit.record_and_commit(session, base)
         raise UnauthorizedError(INVALID_CREDENTIALS, code="invalid_credentials")
@@ -395,8 +415,137 @@ async def me(session: AsyncSession, principal: Principal) -> MeResponse:
 # --- autogestion: perfil y contrasena propios (solo sesion SSO, sin `leo.*`) ---
 
 
-def _self_actor(principal: Principal, meta: RequestMeta) -> Actor:
-    return Actor(principal.user_id, principal.username, principal.session_id, meta)
+@dataclass(frozen=True)
+class SelfManager:
+    """Quien se autogestiona y por que via: la propia sesion SSO (`via=None`)
+    o una app de servicio con el token de acceso del usuario (`via=
+    "servicio:<client_id>"`; ahi la IP es la del backend de la app, asi que no
+    se limita por IP). `keep_session_id` = la unica sesion que sobrevive al
+    cierre de las demas."""
+
+    user_id: UUID
+    username: str
+    keep_session_id: UUID
+    meta: RequestMeta
+    via: str | None = None
+
+    @property
+    def actor(self) -> Actor:
+        return Actor(self.user_id, self.username, self.keep_session_id, self.meta)
+
+    def reason(self, detail: str | None = None) -> str:
+        return users.self_service_reason(self.via, detail)
+
+
+def _session_manager(principal: Principal, meta: RequestMeta) -> SelfManager:
+    return SelfManager(
+        principal.user_id, principal.username, principal.session_id, meta
+    )
+
+
+async def _check_password_attempts(who: SelfManager, message: str):
+    """Rate limit por IP (solo sesion propia) y usuario + bloqueo por
+    contrasenas actuales incorrectas (mecanismo compartido por `/me/password`,
+    el cambio de correo de `/me/profile` y sus equivalentes delegados).
+    Registra el intento. Devuelve (limiters, now, user_key)."""
+    limiters = login_limiters()
+    now = clock.now()
+    user_key = str(who.user_id)
+    wait = await limiters.password_failures.retry_after(user_key, now)
+    if not wait and who.via is None:
+        wait = await limiters.password_by_ip.check_and_hit(
+            who.meta.ip or "desconocida", now
+        )
+    if not wait:
+        wait = await limiters.password_by_user.check_and_hit(user_key, now)
+    if wait:
+        raise TooManyRequestsError(message, wait)
+    return limiters, now, user_key
+
+
+async def _edit_profile(
+    session: AsyncSession, who: SelfManager, data: users.ProfileUpdate
+) -> None:
+    """Logica unica de editar nombres/correo propios (cookie y delegado).
+    Cambiar a OTRO correo exige `current_password`: 422
+    `current_password_required` si falta, 403 `invalid_current_password` si es
+    incorrecta (cuenta como intento fallido, mismos limites que el cambio de
+    contrasena) y, al cambiar, cierra las demas sesiones (motivo
+    `email-change`). Sin cambio de correo, `current_password` se ignora."""
+    email_change = await users.is_email_change(session, who.user_id, data)
+    if email_change:
+        if data.current_password is None:
+            raise ValidationAppError(
+                CURRENT_PASSWORD_REQUIRED,
+                {"field": "current_password"},
+                code="current_password_required",
+            )
+        limiters, now, user_key = await _check_password_attempts(
+            who, TOO_MANY_PROFILE_ATTEMPTS
+        )
+        if not await users.verify_own_password(
+            session, who.user_id, data.current_password
+        ):
+            await limiters.password_failures.hit(user_key, now)
+            await audit.record_and_commit(
+                session,
+                who.actor.entry(
+                    "leo.users.edit",
+                    result="denied",
+                    entity_type="user",
+                    entity_id=str(who.user_id),
+                    reason=who.reason(
+                        "contraseña actual incorrecta al cambiar el correo."
+                    ),
+                ),
+            )
+            raise ForbiddenError(INVALID_CURRENT_PASSWORD, code="invalid_current_password")
+        await limiters.password_failures.reset(user_key)
+    if await users.update_own_profile(session, who.user_id, data, who.actor, who.via):
+        if email_change:
+            await revoke_user_sessions(
+                session,
+                who.user_id,
+                SessionRevokedReason.EMAIL_CHANGE,
+                except_session_id=who.keep_session_id,
+            )
+        await session.commit()
+
+
+async def _change_password(
+    session: AsyncSession, who: SelfManager, current_password: str, new_password: str
+) -> None:
+    """Logica unica de cambiar la contrasena propia (cookie y delegado):
+    cierra TODAS las otras sesiones (motivo `password-change`). Rate limit y
+    bloqueo por contrasenas actuales incorrectas."""
+    limiters, now, user_key = await _check_password_attempts(
+        who, TOO_MANY_PASSWORD_ATTEMPTS
+    )
+    try:
+        await users.change_own_password(
+            session, who.user_id, current_password, new_password, who.actor, who.via
+        )
+    except UnauthorizedError:
+        await limiters.password_failures.hit(user_key, now)
+        await audit.record_and_commit(
+            session,
+            who.actor.entry(
+                "leo.users.reset-password",
+                result="denied",
+                entity_type="user",
+                entity_id=str(who.user_id),
+                reason=who.reason("contraseña actual incorrecta."),
+            ),
+        )
+        raise
+    await limiters.password_failures.reset(user_key)
+    await revoke_user_sessions(
+        session,
+        who.user_id,
+        SessionRevokedReason.PASSWORD_CHANGE,
+        except_session_id=who.keep_session_id,
+    )
+    await session.commit()
 
 
 async def update_profile(
@@ -406,11 +555,8 @@ async def update_profile(
     meta: RequestMeta,
 ) -> MeResponse:
     """Edita nombres/correo del usuario de la sesion (nunca otro: no hay id
-    en la ruta). Devuelve el `MeResponse` actualizado."""
-    if await users.update_own_profile(
-        session, principal.user_id, data, _self_actor(principal, meta)
-    ):
-        await session.commit()
+    en la ruta); reglas en `_edit_profile`."""
+    await _edit_profile(session, _session_manager(principal, meta), data)
     return await me(session, principal)
 
 
@@ -420,48 +566,112 @@ async def change_password(
     data: PasswordChange,
     meta: RequestMeta,
 ) -> None:
-    """Cambia la contrasena propia y cierra TODAS las otras sesiones del
-    usuario (motivo `password-change`); la actual se mantiene. Rate limit por
-    IP y por usuario, y bloqueo por contrasenas actuales incorrectas."""
-    limiters = login_limiters()
-    now = clock.now()
-    user_key, ip_key = str(principal.user_id), meta.ip or "desconocida"
-    wait = max(
-        limiters.password_by_ip.retry_after(ip_key, now),
-        limiters.password_by_user.retry_after(user_key, now),
-        limiters.password_failures.retry_after(user_key, now),
+    """Cambia la contrasena propia y cierra las otras sesiones; la actual se
+    mantiene. Reglas en `_change_password`."""
+    await _change_password(
+        session,
+        _session_manager(principal, meta),
+        data.current_password,
+        data.new_password,
     )
-    if wait:
-        raise TooManyRequestsError(TOO_MANY_PASSWORD_ATTEMPTS, wait)
-    limiters.password_by_ip.hit(ip_key, now)
-    limiters.password_by_user.hit(user_key, now)
 
-    actor = _self_actor(principal, meta)
-    try:
-        await users.change_own_password(
-            session, principal.user_id, data.current_password, data.new_password, actor
-        )
-    except UnauthorizedError:
-        limiters.password_failures.hit(user_key, now)
+
+# --- autogestion delegada: una app de servicio actua con el token del usuario ---
+
+
+def _invalid_user_token() -> UnauthorizedError:
+    return UnauthorizedError(
+        "Token de usuario inválido o vencido.",
+        code="invalid_token",
+        www_authenticate="Bearer",
+        details={"field": "user_access_token"},
+    )
+
+
+async def _delegated_manager(
+    session: AsyncSession,
+    caller: ServicePrincipal,
+    user_access_token: str,
+    meta: RequestMeta,
+    tag: str,
+) -> SelfManager:
+    """Usuario objetivo de una llamada delegada, SIEMPRE derivado del token
+    (nunca de un id del cliente). Rate limit por app y por usuario; el token
+    debe ser access vigente de ESA app (la llamadora), con sesion viva,
+    usuario activo y rol en la app (mismas reglas que la introspeccion; el
+    jkt no se exige: no hay navegador, la prueba de posesion es la
+    credencial de servicio de la app duena del token). 401 generico si no
+    sirve. El usuario no puede tener ningun permiso `leo.*` ni rol de Leo
+    (cuentas sin privilegios): si no, 403 generico + evento `denied`."""
+    limiters = login_limiters()
+    wait = await limiters.delegated_by_app.check_and_hit(str(caller.application_id))
+    if wait:
+        raise TooManyRequestsError(TOO_MANY_DELEGATED, wait)
+    owner = await _resolve_owner(
+        session, caller.application_id, user_access_token, None, touch=False
+    )
+    await session.commit()  # revocacion por inactividad, si la hubo
+    if owner is None:
+        raise _invalid_user_token()
+    wait = await limiters.delegated_by_user.check_and_hit(str(owner.user_id))
+    if wait:
+        raise TooManyRequestsError(TOO_MANY_DELEGATED, wait)
+    who = SelfManager(
+        owner.user_id,
+        owner.username,
+        owner.session_id,
+        meta,
+        via=caller.actor_name,
+    )
+    leo_id = await applications.leo_application_id(session)
+    if await roles.has_access(session, owner.user_id, leo_id) or (
+        await roles.effective_permissions(session, owner.user_id, leo_id)
+    ):
         await audit.record_and_commit(
             session,
-            actor.entry(
-                "leo.users.reset-password",
+            who.actor.entry(
+                tag,
                 result="denied",
                 entity_type="user",
-                entity_id=str(principal.user_id),
-                reason="autogestión: contraseña actual incorrecta.",
+                entity_id=str(owner.user_id),
+                reason=who.reason("usuario con privilegios de Leo; vía delegada."),
             ),
         )
-        raise
-    limiters.password_failures.reset(user_key)
-    await revoke_user_sessions(
-        session,
-        principal.user_id,
-        SessionRevokedReason.PASSWORD_CHANGE,
-        except_session_id=principal.session_id,
-    )
-    await session.commit()
+        raise ForbiddenError("No tienes permiso para realizar esta acción.")
+    return who
+
+
+async def delegated_update_profile(
+    session: AsyncSession,
+    caller: ServicePrincipal,
+    user_access_token: str,
+    data: users.ProfileUpdate,
+    meta: RequestMeta,
+    tag: str,
+) -> users.UserIdentity:
+    """`PATCH /users/service/delegated/profile`: misma logica que
+    `update_profile` sobre el usuario del token; devuelve su identidad."""
+    who = await _delegated_manager(session, caller, user_access_token, meta, tag)
+    await _edit_profile(session, who, data)
+    identity = await users.get_identity(session, who.user_id)
+    assert identity is not None
+    return identity
+
+
+async def delegated_change_password(
+    session: AsyncSession,
+    caller: ServicePrincipal,
+    user_access_token: str,
+    current_password: str,
+    new_password: str,
+    meta: RequestMeta,
+    tag: str,
+) -> None:
+    """`POST /users/service/delegated/password`: misma logica que
+    `change_password` sobre el usuario del token (la sesion del token se
+    mantiene; las demas se cierran)."""
+    who = await _delegated_manager(session, caller, user_access_token, meta, tag)
+    await _change_password(session, who, current_password, new_password)
 
 
 async def logout(
@@ -575,8 +785,8 @@ async def authorize(
             ),
         )
         raise ForbiddenError(
-            f"No tienes acceso a «{client.name}». Pide a un administrador que te "
-            "asigne un rol en esa aplicación.",
+            "No tienes acceso a esta aplicación. Pide a un administrador que te "
+            "asigne un rol en ella.",
             {"client_id": client.client_id},
             code="access_denied",
         )
@@ -862,13 +1072,12 @@ async def issue_service_token(
     now = clock.now()
     limiter = service_token_limiter()
     key = str(client.id)
-    wait = limiter.retry_after(key, now)
+    wait = await limiter.check_and_hit(key, now)
     if wait:
         raise TooManyRequestsError(
             "Demasiadas solicitudes de token de servicio. Intenta de nuevo más tarde.",
             wait,
         )
-    limiter.hit(key, now)
 
     audience = await applications.get_client_info(session, data.audience)
     if audience is None or not audience.is_active or audience.id == client.id:
@@ -945,6 +1154,20 @@ async def resolve_access_token(
     """Dueno de un access token vigente de ESA app y atado a ESE jkt, con
     sesion viva, usuario activo y acceso a la app; si no, None. Con
     `touch=True` desliza la inactividad. Sin commit."""
+    return await _resolve_owner(session, application_id, token_value, jkt, touch=touch)
+
+
+async def _resolve_owner(
+    session: AsyncSession,
+    application_id: UUID,
+    token_value: str,
+    jkt: str | None,
+    *,
+    touch: bool,
+) -> TokenOwner | None:
+    """Base de `resolve_access_token`. `jkt=None` NO verifica la llave del
+    dispositivo: solo para la autogestion delegada, donde llama el backend de
+    la propia app autenticado con su credencial de servicio."""
     now = clock.now()
     token = await repository.token_by_hash(session, sha256_hex(token_value))
     if (
@@ -953,7 +1176,7 @@ async def resolve_access_token(
         or token.application_id != application_id
         or token.revoked_at is not None
         or token.expires_at <= now
-        or not constant_time_equals(token.jkt, jkt)
+        or (jkt is not None and not constant_time_equals(token.jkt, jkt))
     ):
         return None
     sso = await _live_session(session, token.session_id, now)

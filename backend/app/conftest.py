@@ -94,12 +94,12 @@ async def session(api_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
         await outer.rollback()
 
 
-@pytest.fixture(autouse=True)
-def _reset_process_state() -> None:
+@pytest_asyncio.fixture(autouse=True)
+async def _reset_process_state() -> None:
     """Limitadores del login y cache anti-replay son de proceso: cada test
     empieza limpio."""
-    login_limiters().reset()
-    service_token_limiter().reset()
+    await login_limiters().reset()
+    await service_token_limiter().reset()
     replay_cache.clear()
 
 

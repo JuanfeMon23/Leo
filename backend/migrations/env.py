@@ -1,7 +1,9 @@
 """Entorno de Alembic (async, asyncpg).
 
-La URL sale de `DATABASE_URL`: primero del entorno del proceso (los tests la
-sobreescriben para apuntar a `leo_test`), si no de `backend/.env`.
+La URL sale de `MIGRATION_DATABASE_URL` (rol `leo_migrator`, dueno del
+esquema) si existe; si no, de `DATABASE_URL`. Primero del entorno del proceso
+(los tests lo sobreescriben para apuntar a `leo_test`), si no de
+`backend/.env`. Un valor vacio cuenta como ausente.
 """
 
 import asyncio
@@ -16,13 +18,17 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")  # no pisa el entorno
 
-from app.core.db.registry import Base  # noqa: E402
+from app.core.db.registry import Base
 
 config = context.config
 
-database_url = os.environ.get("DATABASE_URL")
+database_url = os.environ.get("MIGRATION_DATABASE_URL") or os.environ.get(
+    "DATABASE_URL"
+)
 if not database_url:
-    raise RuntimeError("Falta DATABASE_URL (backend/.env o entorno).")
+    raise RuntimeError(
+        "Falta DATABASE_URL o MIGRATION_DATABASE_URL (backend/.env o entorno)."
+    )
 config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 
 if config.config_file_name is not None:

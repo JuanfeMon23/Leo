@@ -38,6 +38,7 @@ class SessionRevokedReason(enum.StrEnum):
     REFRESH_REUSE = "refresh-reuse"
     IDLE_TIMEOUT = "idle-timeout"
     PASSWORD_CHANGE = "password-change"
+    EMAIL_CHANGE = "email-change"
 
 
 class TokenType(enum.StrEnum):

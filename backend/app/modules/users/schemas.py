@@ -93,6 +93,14 @@ class ProfileUpdate(UpdateModel):
     email: Email | None = None
     first_name: PersonName | None = None
     last_name: PersonName | None = None
+    current_password: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=1024,
+        description="Contraseña actual: obligatoria SOLO si `email` cambia a otro "
+        "correo (anti toma de cuenta con sesión robada). Sin cambio de correo "
+        "se ignora (no se verifica ni cuenta como intento).",
+    )
 
 
 class PasswordReset(BaseModel):
@@ -156,3 +164,43 @@ class PatientRead(BaseModel):
     last_name: str
     is_active: bool
     created_at: datetime
+
+
+USER_ACCESS_TOKEN_FIELD = Field(
+    min_length=1,
+    max_length=512,
+    description="Access token que Leo emitio al usuario para la app llamadora. "
+    "De el sale el usuario objetivo; nunca se acepta un id del cliente.",
+)
+
+
+class DelegatedProfileUpdate(ProfileUpdate):
+    """Cuerpo de `PATCH /users/service/delegated/profile`: los campos de
+    `ProfileUpdate` + el token del usuario."""
+
+    user_access_token: str = USER_ACCESS_TOKEN_FIELD
+
+    def profile(self) -> ProfileUpdate:
+        """Solo los campos del perfil, conservando cuales venian informados."""
+        return ProfileUpdate.model_validate(
+            self.model_dump(exclude={"user_access_token"}, exclude_unset=True)
+        )
+
+
+class DelegatedPasswordChange(BaseModel):
+    """Cuerpo de `POST /users/service/delegated/password`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    user_access_token: str = USER_ACCESS_TOKEN_FIELD
+    current_password: str = Field(min_length=1, max_length=1024)
+    new_password: str = Field(min_length=1, max_length=1024)
+
+
+class DelegatedProfileRead(BaseModel):
+    """Perfil minimo devuelto tras editar en nombre del usuario."""
+
+    first_name: str
+    last_name: str
+    email: str
+    username: str

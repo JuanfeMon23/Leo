@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { passwordChangeSchema, profileSchema } from './profileSchemas'
+import { passwordChangeSchema, profileFormSchema, profileSchema } from './profileSchemas'
 
 type Parser = { safeParse: (v: unknown) => { success: boolean, error?: { issues: { path: (string | number)[], message: string }[] } } }
 
@@ -62,5 +62,32 @@ describe('passwordChangeSchema', () => {
 
   it('la confirmación debe coincidir', () => {
     expect(issues(schema, { ...valid, confirm_password: 'Otra-Clave-2026!' }).confirm_password).toMatch(/no coinciden/)
+  })
+})
+
+describe('profileFormSchema (contraseña actual condicional)', () => {
+  const schema = profileFormSchema(() => 'ana@x.co')
+  const base = { first_name: 'Ana', last_name: 'Pérez', email: 'ana@x.co' }
+
+  it('correo sin cambios: no pide contraseña actual', () => {
+    expect(issues(schema, base)).toEqual({})
+    expect(issues(schema, { ...base, email: ' ana@x.co ' })).toEqual({})
+  })
+
+  it('correo cambiado sin contraseña actual: error en current_password', () => {
+    expect(issues(schema, { ...base, email: 'otro@x.co' }).current_password).toMatch(/contraseña actual/i)
+    expect(issues(schema, { ...base, email: 'otro@x.co', current_password: '' }).current_password).toBeTruthy()
+  })
+
+  it('correo cambiado con contraseña actual: válido', () => {
+    expect(issues(schema, { ...base, email: 'otro@x.co', current_password: 'x' })).toEqual({})
+  })
+
+  it('lee el correo actual al validar', () => {
+    let current = 'ana@x.co'
+    const live = profileFormSchema(() => current)
+    expect(issues(live, { ...base, email: 'b@x.co' }).current_password).toBeTruthy()
+    current = 'b@x.co'
+    expect(issues(live, { ...base, email: 'b@x.co' })).toEqual({})
   })
 })

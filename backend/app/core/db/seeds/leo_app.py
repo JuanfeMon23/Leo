@@ -15,6 +15,9 @@ from app.core.db.seeds.catalog import (
     LEO_APP_DESCRIPTION,
     LEO_APP_NAME,
     LEO_APP_SLUG,
+    LEO_DELEGATE_ROLE_NAME,
+    LEO_DELEGATE_ROLE_SLUG,
+    LEO_DELEGATED_SELF_MANAGE_TAG,
     LEO_MODULES,
     LEO_PROVISION_PATIENT_TAG,
     LEO_PROVISIONER_ROLE_NAME,
@@ -114,22 +117,19 @@ def seed_leo_admin_role(conn: Connection, app_id: UUID) -> UUID:
     return role_id
 
 
-def seed_leo_provisioner_role(conn: Connection, app_id: UUID) -> UUID:
-    """Crea `leo-patient-provisioner` (rol concedible a una app llamadora) con
-    la unica accion `leo.users.provision-patient`; devuelve su id."""
+def _seed_service_role(
+    conn: Connection, app_id: UUID, slug: str, name: str, tag: str
+) -> UUID:
+    """Crea el rol de servicio `slug` si falta, con la unica accion `tag`."""
     roles, actions = Role.__table__, Action.__table__
     conn.execute(
         insert(roles)
-        .values(
-            application_id=app_id,
-            slug=LEO_PROVISIONER_ROLE_SLUG,
-            name=LEO_PROVISIONER_ROLE_NAME,
-        )
+        .values(application_id=app_id, slug=slug, name=name)
         .on_conflict_do_nothing(index_elements=["application_id", "slug"])
     )
     role_id = conn.scalar(
         select(roles.c.id).where(
-            roles.c.application_id == app_id, roles.c.slug == LEO_PROVISIONER_ROLE_SLUG
+            roles.c.application_id == app_id, roles.c.slug == slug
         )
     )
     conn.execute(
@@ -137,9 +137,34 @@ def seed_leo_provisioner_role(conn: Connection, app_id: UUID) -> UUID:
         .from_select(
             ["role_id", "action_id", "application_id"],
             select(literal(role_id), actions.c.id, actions.c.application_id).where(
-                actions.c.tag == LEO_PROVISION_PATIENT_TAG
+                actions.c.tag == tag
             ),
         )
         .on_conflict_do_nothing(index_elements=["role_id", "action_id"])
     )
     return role_id
+
+
+def seed_leo_provisioner_role(conn: Connection, app_id: UUID) -> UUID:
+    """Crea `leo-patient-provisioner` (rol concedible a una app llamadora) con
+    la unica accion `leo.users.provision-patient`; devuelve su id."""
+    return _seed_service_role(
+        conn,
+        app_id,
+        LEO_PROVISIONER_ROLE_SLUG,
+        LEO_PROVISIONER_ROLE_NAME,
+        LEO_PROVISION_PATIENT_TAG,
+    )
+
+
+def seed_leo_delegate_role(conn: Connection, app_id: UUID) -> UUID:
+    """Crea `leo-self-service-delegate` (rol concedible a una app llamadora)
+    con la unica accion `leo.users.delegated-self-manage`; devuelve su id.
+    Idempotente; la semilla NO lo concede a ninguna app."""
+    return _seed_service_role(
+        conn,
+        app_id,
+        LEO_DELEGATE_ROLE_SLUG,
+        LEO_DELEGATE_ROLE_NAME,
+        LEO_DELEGATED_SELF_MANAGE_TAG,
+    )

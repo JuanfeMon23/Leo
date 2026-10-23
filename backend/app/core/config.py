@@ -5,9 +5,11 @@ Es el unico punto de acceso a variables de entorno: ningun otro modulo lee
 solo en `.env` (no versionado); `.env.example` lista las claves.
 """
 
+import ipaddress
 from functools import lru_cache
+from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -35,6 +37,14 @@ class Settings(BaseSettings):
       credentials), 10 por defecto y tope 60 (la BD lo exige).
     - `LEO_SERVICE_TOKEN_RATE_LIMIT_PER_MINUTE`: emisiones de tokens de
       servicio por minuto y por cliente (30 por defecto).
+    - `LEO_RATE_LIMIT_BACKEND`: `memory` (por proceso; default, solo dev) o
+      `postgres` (compartido entre procesos; obligatorio en produccion con
+      mas de un proceso/instancia). Ver `app.core.rate_limit`.
+    - `LEO_TRUSTED_PROXIES`: IP/CIDR separados por comas de los proxies
+      inversos de confianza. Vacio (default): `X-Forwarded-For`/`X-Real-IP`
+      se ignoran. Ver `app.core.client_ip`.
+    - `MIGRATION_DATABASE_URL` (solo Alembic, ver `migrations/env.py`): DSN
+      del rol `leo_migrator`; si falta, Alembic usa `DATABASE_URL`.
     """
 
     model_config = _ENV
@@ -52,6 +62,17 @@ class Settings(BaseSettings):
     leo_service_token_minutes: int = Field(default=10, gt=0, le=60)
     leo_service_token_rate_limit_per_minute: int = Field(default=30, gt=0)
     leo_provision_rate_limit_per_minute: int = Field(default=20, gt=0)
+    leo_delegated_rate_limit_per_minute: int = Field(default=120, gt=0)
+    leo_rate_limit_backend: Literal["memory", "postgres"] = "memory"
+    leo_trusted_proxies: str = ""
+
+    @field_validator("leo_trusted_proxies")
+    @classmethod
+    def _valid_trusted_proxies(cls, value: str) -> str:
+        for item in value.split(","):
+            if item.strip():
+                ipaddress.ip_network(item.strip(), strict=False)  # ValueError -> 422
+        return value
 
 
 class SeedSettings(BaseSettings):
