@@ -36,3 +36,9 @@ export const ALL_SESSIONS_TAGS = [
   'leo.auth.view',
   'leo.auth.revoke'
 ]
+
+export const ALL_SETTINGS_TAGS = [
+  'leo.settings.view',
+  'leo.settings.edit',
+  'leo.settings.edit-security'
+]

@@ -3,6 +3,7 @@ import { enableAutoUnmount, flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LeoApiError } from '#leo-client/lib/errors'
 import { ALL_USERS_TAGS, signInWith } from '../../../../tests/helpers/session'
+import { clearPasswordPolicyCache } from '../../../../app/composables/usePasswordPolicy'
 import UsersResetPasswordModal from './UsersResetPasswordModal.vue'
 
 enableAutoUnmount(afterEach)
@@ -17,6 +18,7 @@ const user = {
 
 beforeEach(() => {
   api.mockReset()
+  clearPasswordPolicyCache()
   signInWith(ALL_USERS_TAGS)
 })
 afterEach(() => { document.body.innerHTML = '' })
@@ -41,7 +43,7 @@ describe('UsersResetPasswordModal', () => {
     await mountSuspended(UsersResetPasswordModal, { props: { open: true, user }, attachTo: document.body })
     await type('Clave-luis-2026!')
     submit()
-    await vi.waitFor(() => expect(api).toHaveBeenCalled())
+    await vi.waitFor(() => expect(api).toHaveBeenCalledWith(expect.stringContaining('/users'), expect.anything()))
     expect(api).toHaveBeenCalledWith('/users/u2/reset-password', { method: 'POST', body: { password: 'Clave-luis-2026!' } })
   })
 
@@ -50,7 +52,7 @@ describe('UsersResetPasswordModal', () => {
     const wrapper = await mountSuspended(UsersResetPasswordModal, { props: { open: true, user }, attachTo: document.body })
     await type('Segura-Clave-2026')
     submit()
-    await vi.waitFor(() => expect(api).toHaveBeenCalled())
+    await vi.waitFor(() => expect(api).toHaveBeenCalledWith(expect.stringContaining('/users'), expect.anything()))
     await flushPromises()
     expect(api).toHaveBeenCalledWith('/users/u2/reset-password', { method: 'POST', body: { password: 'Segura-Clave-2026' } })
     expect(wrapper.emitted('saved')).toHaveLength(1)

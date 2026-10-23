@@ -3,6 +3,7 @@ import { enableAutoUnmount, flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LeoApiError } from '#leo-client/lib/errors'
 import { signInWith } from '../../../../tests/helpers/session'
+import { clearPasswordPolicyCache } from '../../../../app/composables/usePasswordPolicy'
 import ProfilePasswordForm from './ProfilePasswordForm.vue'
 
 enableAutoUnmount(afterEach)
@@ -17,6 +18,8 @@ type Attr = { attributes: (name: string) => string | undefined }
 type El = { element: HTMLInputElement }
 type Wrapper = Awaited<ReturnType<typeof mountSuspended>>
 const inputs = (w: Wrapper) => w.findAll('input')
+// Llamadas distintas de la lectura de la política de contraseña.
+const writes = () => api.mock.calls.filter(c => c[0] !== '/auth/password-policy')
 const dialog = () => document.body.querySelector('[role="dialog"]')
 const reqs = (w: Wrapper) => w.findAll('[data-testid="password-requirement"]').map((li: Attr) => li.attributes('data-met'))
 
@@ -38,6 +41,7 @@ async function confirmDialog() {
 
 beforeEach(() => {
   api.mockReset()
+  clearPasswordPolicyCache()
   signInWith([]) // usuario ana, correo a@x.co
 })
 afterEach(() => { document.body.innerHTML = '' })
@@ -54,16 +58,27 @@ describe('ProfilePasswordForm', () => {
     expect(w.text()).not.toContain('Hola-ana-2026!') // solo vive en el campo
   })
 
+  it('muestra y aplica la política que publica el servidor', async () => {
+    api.mockResolvedValue({
+      min_length: 6, max_length: 64, require_lowercase: true, require_uppercase: false, require_digit: false, require_symbol: false
+    })
+    const w = await mountSuspended(ProfilePasswordForm)
+    await vi.waitFor(() => expect(reqs(w)).toHaveLength(2))
+    expect(api).toHaveBeenCalledWith('/auth/password-policy', { skipSessionHandling: true })
+    await inputs(w)[1]!.setValue('minuscula')
+    expect(reqs(w)).toEqual(['true', 'true'])
+  })
+
   it('débil, igual a la actual o sin coincidir: errores y no se pide confirmación ni se llama a la API', async () => {
     const w = await mountSuspended(ProfilePasswordForm)
     await fill(w, OLD, 'corta', 'otra')
     await submit(w)
-    await vi.waitFor(() => expect(w.text()).toContain('Falta:'))
+    await vi.waitFor(() => expect(w.text()).toContain('aún no cumple todos los requisitos'))
     expect(w.text()).toContain('Las contraseñas no coinciden.')
     await fill(w, NEW, NEW)
     await submit(w)
     await vi.waitFor(() => expect(w.text()).toContain('distinta de la actual'))
-    expect(api).not.toHaveBeenCalled()
+    expect(writes()).toEqual([])
     expect(dialog()).toBeNull()
   })
 
@@ -73,7 +88,7 @@ describe('ProfilePasswordForm', () => {
     await submit(w)
     await vi.waitFor(() => expect(dialog()).not.toBeNull())
     expect(dialog()!.textContent).toContain('demás sesiones')
-    expect(api).not.toHaveBeenCalled()
+    expect(writes()).toEqual([])
   })
 
   it('éxito: envía las contraseñas, avisa, limpia el formulario y mantiene la sesión', async () => {

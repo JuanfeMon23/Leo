@@ -5,20 +5,17 @@ import { profilePasswordErrors } from '../utils/profileErrors'
 
 /**
  * Cambiar la contraseña propia. Valida la política del backend en vivo
- * (`UiPasswordRequirements`), pide confirmación (se cierran las demás
+ * (`UiPasswordRequirements`, política del servidor), pide confirmación (se cierran las demás
  * sesiones) y mapea los errores del backend a su campo. Las contraseñas solo
  * viven en los campos: nunca se persisten ni se muestran, y se limpian al
  * terminar o al salir de la página.
  */
-const session = useLeoSession()
 const api = useProfileApi()
 const toast = useToast()
+const { policy } = usePasswordPolicy()
 
-const user = computed(() => session.user.value)
-
-// La política depende del usuario y del correo ACTUALES (se leen en cada validación,
-// así un cambio de correo hecho en esta misma página se respeta).
-const form = useZodForm(passwordChangeSchema(() => ({ username: user.value?.username, email: user.value?.email })), {
+// La política es la del servidor (`usePasswordPolicy`); se lee en cada validación.
+const form = useZodForm(passwordChangeSchema(() => policy.value), {
   initialValues: () => ({ current_password: '', new_password: '', confirm_password: '' })
 })
 const values = form.values as { current_password?: string, new_password?: string, confirm_password?: string }
@@ -73,7 +70,7 @@ onBeforeUnmount(() => form.reset())
       <UiFormField name="new_password" label="Contraseña nueva" required>
         <UiPasswordInput autocomplete="new-password" />
       </UiFormField>
-      <UiPasswordRequirements :password="values.new_password ?? ''" :username="user?.username" :email="user?.email" />
+      <UiPasswordRequirements :password="values.new_password ?? ''" :policy="policy" />
       <UiFormField name="confirm_password" label="Confirmar contraseña nueva" required>
         <UiPasswordInput autocomplete="new-password" />
       </UiFormField>

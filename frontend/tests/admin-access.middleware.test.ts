@@ -21,7 +21,8 @@ const ADMIN: [string, string][] = [
   ['/applications', 'applications'],
   ['/applications/1', 'applications detalle'],
   ['/audit', 'audit'],
-  ['/sessions', 'sessions']
+  ['/sessions', 'sessions'],
+  ['/ajustes', 'ajustes']
 ]
 
 beforeEach(() => navigateToMock.mockClear())
