@@ -221,10 +221,15 @@ class PostgresRateLimitStore:
 
 
 class SlidingWindowLimiter:
+    """Limitador de un `bucket`. `limit` y `window_seconds` del constructor son
+    solo valores por defecto: cada llamada puede pasar los suyos (`limit=`,
+    `window_seconds=`), asi la politica se lee de `settings` en cada peticion y
+    un cambio aplica sin reiniciar."""
+
     def __init__(
         self,
-        limit: int,
-        window_seconds: int,
+        limit: int | None = None,
+        window_seconds: int | None = None,
         *,
         bucket: str = "default",
         store: RateLimitStore | None = None,
@@ -234,19 +239,61 @@ class SlidingWindowLimiter:
         self.bucket = bucket
         self.store: RateLimitStore = store or MemoryRateLimitStore()
 
-    async def retry_after(self, key: str, at: datetime | None = None) -> int:
+    def _limit(self, limit: int | None) -> int:
+        value = self.limit if limit is None else limit
+        if value is None:
+            raise ValueError(f"El limitador «{self.bucket}» no tiene límite definido.")
+        return value
+
+    def _window(self, window_seconds: int | None) -> int:
+        value = self.window_seconds if window_seconds is None else window_seconds
+        if value is None:
+            raise ValueError(f"El limitador «{self.bucket}» no tiene ventana definida.")
+        return value
+
+    async def retry_after(
+        self,
+        key: str,
+        at: datetime | None = None,
+        *,
+        limit: int | None = None,
+        window_seconds: int | None = None,
+    ) -> int:
         """Segundos hasta poder volver a intentar; 0 si no esta limitado."""
         return await self.store.retry_after(
-            self.bucket, key, self.limit, self.window_seconds, at or clock.now()
+            self.bucket,
+            key,
+            self._limit(limit),
+            self._window(window_seconds),
+            at or clock.now(),
         )
 
-    async def hit(self, key: str, at: datetime | None = None) -> None:
-        await self.store.hit(self.bucket, key, self.window_seconds, at or clock.now())
+    async def hit(
+        self,
+        key: str,
+        at: datetime | None = None,
+        *,
+        window_seconds: int | None = None,
+    ) -> None:
+        await self.store.hit(
+            self.bucket, key, self._window(window_seconds), at or clock.now()
+        )
 
-    async def check_and_hit(self, key: str, at: datetime | None = None) -> int:
+    async def check_and_hit(
+        self,
+        key: str,
+        at: datetime | None = None,
+        *,
+        limit: int | None = None,
+        window_seconds: int | None = None,
+    ) -> int:
         """Atomico: 0 y registra el intento si hay cupo; si no, la espera."""
         return await self.store.check_and_hit(
-            self.bucket, key, self.limit, self.window_seconds, at or clock.now()
+            self.bucket,
+            key,
+            self._limit(limit),
+            self._window(window_seconds),
+            at or clock.now(),
         )
 
     async def reset(self, key: str | None = None) -> None:
@@ -271,8 +318,11 @@ def _store_for_settings() -> RateLimitStore | None:
     return _postgres_store
 
 
-def make_limiter(bucket: str, limit: int, window_seconds: int) -> SlidingWindowLimiter:
-    """Limitador del backend configurado (`LEO_RATE_LIMIT_BACKEND`)."""
+def make_limiter(
+    bucket: str, limit: int | None = None, window_seconds: int | None = None
+) -> SlidingWindowLimiter:
+    """Limitador del backend configurado (`LEO_RATE_LIMIT_BACKEND`). Sin
+    `limit`/`window_seconds` (lo normal), cada llamada los pasa."""
     return SlidingWindowLimiter(
         limit, window_seconds, bucket=bucket, store=_store_for_settings()
     )

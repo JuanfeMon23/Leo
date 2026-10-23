@@ -9,7 +9,7 @@ import ipaddress
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -24,19 +24,8 @@ class Settings(BaseSettings):
     - `LEO_PUBLIC_URL`: URL base publica de esta API (esquema + host +
       puerto, sin `/` final). Con ella se arma el `htu` esperado de las
       pruebas DPoP (`LEO_PUBLIC_URL + path`).
-    - `LEO_IDLE_TIMEOUT_MINUTES`: inactividad maxima de una sesion (30).
-    - `LEO_ACCESS_TOKEN_MINUTES`: vida del access token de las apps (15).
-    - `LEO_SESSION_MAX_HOURS`: vida absoluta maxima de una sesion SSO.
     - `LEO_COOKIE_SECURE`: `true` en produccion (HTTPS): cookie `Secure` con
       prefijo `__Host-`. `false` solo en desarrollo local por HTTP.
-    - `LEO_LOGIN_MAX_FAILED_ATTEMPTS` / `LEO_LOGIN_LOCK_MINUTES`: bloqueo
-      temporal de un usuario tras N contrasenas incorrectas seguidas.
-    - `LEO_LOGIN_RATE_LIMIT_PER_MINUTE`: intentos de login por minuto, por IP
-      y por usuario.
-    - `LEO_SERVICE_TOKEN_MINUTES`: vida del token de servicio (client
-      credentials), 10 por defecto y tope 60 (la BD lo exige).
-    - `LEO_SERVICE_TOKEN_RATE_LIMIT_PER_MINUTE`: emisiones de tokens de
-      servicio por minuto y por cliente (30 por defecto).
     - `LEO_RATE_LIMIT_BACKEND`: `memory` (por proceso; default, solo dev) o
       `postgres` (compartido entre procesos; obligatorio en produccion con
       mas de un proceso/instancia). Ver `app.core.rate_limit`.
@@ -45,6 +34,12 @@ class Settings(BaseSettings):
       se ignoran. Ver `app.core.client_ip`.
     - `MIGRATION_DATABASE_URL` (solo Alembic, ver `migrations/env.py`): DSN
       del rol `leo_migrator`; si falta, Alembic usa `DATABASE_URL`.
+
+    Las politicas (inactividad, vida de tokens y sesion, bloqueo de login,
+    limites de intentos, contrasenas, paginacion, export) YA NO son variables
+    de entorno: viven en la tabla `settings` y se editan desde la pantalla
+    Ajustes (ver `app.core.runtime_settings`). Las variables antiguas solo se
+    leen una vez, como valor inicial (`LegacyPolicyEnv`).
     """
 
     model_config = _ENV
@@ -52,17 +47,7 @@ class Settings(BaseSettings):
     database_url: str
     leo_frontend_url: str
     leo_public_url: str
-    leo_idle_timeout_minutes: int = Field(gt=0)
-    leo_access_token_minutes: int = Field(gt=0)
-    leo_session_max_hours: int = Field(gt=0)
     leo_cookie_secure: bool
-    leo_login_max_failed_attempts: int = Field(gt=0)
-    leo_login_lock_minutes: int = Field(gt=0)
-    leo_login_rate_limit_per_minute: int = Field(gt=0)
-    leo_service_token_minutes: int = Field(default=10, gt=0, le=60)
-    leo_service_token_rate_limit_per_minute: int = Field(default=30, gt=0)
-    leo_provision_rate_limit_per_minute: int = Field(default=20, gt=0)
-    leo_delegated_rate_limit_per_minute: int = Field(default=120, gt=0)
     leo_rate_limit_backend: Literal["memory", "postgres"] = "memory"
     leo_trusted_proxies: str = ""
 
@@ -73,6 +58,66 @@ class Settings(BaseSettings):
             if item.strip():
                 ipaddress.ip_network(item.strip(), strict=False)  # ValueError -> 422
         return value
+
+
+# Variable de entorno antigua -> claves de `settings` que alimenta. Solo se usa
+# en el primer arranque (`LegacyPolicyEnv`), para no cambiar el comportamiento
+# de un despliegue existente al pasar las politicas a la BD.
+LEGACY_POLICY_ENV: dict[str, tuple[str, ...]] = {
+    "LEO_IDLE_TIMEOUT_MINUTES": ("auth.idle_timeout_minutes",),
+    "LEO_ACCESS_TOKEN_MINUTES": ("auth.access_token_minutes",),
+    "LEO_SESSION_MAX_HOURS": ("auth.session_max_hours",),
+    "LEO_LOGIN_MAX_FAILED_ATTEMPTS": ("auth.login_max_failed_attempts",),
+    "LEO_LOGIN_LOCK_MINUTES": ("auth.login_lock_minutes",),
+    "LEO_LOGIN_RATE_LIMIT_PER_MINUTE": (
+        "rate_limit.login_ip_per_window",
+        "rate_limit.login_user_per_window",
+        "rate_limit.password_ip_per_window",
+        "rate_limit.password_user_per_window",
+        "rate_limit.delegated_user_per_window",
+    ),
+    "LEO_SERVICE_TOKEN_MINUTES": ("auth.service_token_minutes",),
+    "LEO_SERVICE_TOKEN_RATE_LIMIT_PER_MINUTE": ("rate_limit.service_token_per_window",),
+    "LEO_PROVISION_RATE_LIMIT_PER_MINUTE": ("rate_limit.provision_per_window",),
+    "LEO_DELEGATED_RATE_LIMIT_PER_MINUTE": ("rate_limit.delegated_app_per_window",),
+}
+
+
+class LegacyPolicyEnv(BaseSettings):
+    """Variables de politica que existian antes de la tabla `settings`.
+
+    Opcionales y NO documentadas como configuracion: si existen en el entorno
+    (o en `.env`), `initial_values()` las entrega como valor inicial de las
+    claves nuevas; la semilla del registro solo las usa al INSERTAR la clave,
+    asi que despues la unica fuente es la BD. Un valor no numerico se ignora.
+    """
+
+    model_config = _ENV
+
+    leo_idle_timeout_minutes: str | None = None
+    leo_access_token_minutes: str | None = None
+    leo_session_max_hours: str | None = None
+    leo_login_max_failed_attempts: str | None = None
+    leo_login_lock_minutes: str | None = None
+    leo_login_rate_limit_per_minute: str | None = None
+    leo_service_token_minutes: str | None = None
+    leo_service_token_rate_limit_per_minute: str | None = None
+    leo_provision_rate_limit_per_minute: str | None = None
+    leo_delegated_rate_limit_per_minute: str | None = None
+
+    def initial_values(self) -> dict[str, int]:
+        values: dict[str, int] = {}
+        for env_name, keys in LEGACY_POLICY_ENV.items():
+            raw = getattr(self, env_name.lower())
+            if raw is None:
+                continue
+            try:
+                number = int(raw.strip())
+            except ValueError:
+                continue
+            for key in keys:
+                values[key] = number
+        return values
 
 
 class SeedSettings(BaseSettings):

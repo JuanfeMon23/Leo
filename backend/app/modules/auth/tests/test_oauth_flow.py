@@ -21,6 +21,7 @@ from app.testkit import (
     make_role,
     make_user,
     pkce_pair,
+    set_setting,
 )
 
 AUTHORIZE = "/api/v1/auth/authorize"
@@ -214,12 +215,10 @@ async def test_introspeccion_desliza_la_actividad(flow: Flow, advance):
     assert refreshed.status_code == 200, refreshed.text
 
 
-async def test_inactividad_rechaza_la_introspeccion(flow: Flow, advance, monkeypatch):
+async def test_inactividad_rechaza_la_introspeccion(flow: Flow, advance, session):
     """Con la inactividad menor que la vida del access token, la
     introspeccion es la que corta y revoca la sesion."""
-    from app.core.config import get_settings
-
-    monkeypatch.setattr(get_settings(), "leo_idle_timeout_minutes", 10)
+    await set_setting(session, "auth.idle_timeout_minutes", 10)
     tokens = await flow.tokens()
     advance(11)
     assert (await flow.introspect(tokens["access_token"]))["active"] is False

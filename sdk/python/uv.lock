@@ -444,7 +444,7 @@ wheels = [
 
 [[package]]
 name = "leo-sdk"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
@@ -452,6 +452,11 @@ dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+]
+
+[package.optional-dependencies]
+settings = [
+    { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 
 [package.dev-dependencies]
@@ -473,7 +478,9 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "pydantic", specifier = ">=2.14.1" },
     { name = "pydantic-settings", specifier = ">=2.16.0" },
+    { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'settings'", specifier = ">=2.0" },
 ]
+provides-extras = ["settings"]
 
 [package.metadata.requires-dev]
 dev = [

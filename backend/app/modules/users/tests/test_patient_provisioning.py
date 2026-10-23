@@ -14,7 +14,6 @@ from app.core.db.seeds.acuarius_app import (
 )
 from app.core.db.seeds.catalog import LEO_PROVISIONER_ROLE_SLUG
 from app.core.db.seeds.leo_app import seed_leo_provisioner_role
-from app.core.rate_limit import SlidingWindowLimiter
 from app.modules.applications.models import Action, Application
 from app.modules.audit.models import AuditEvent
 from app.modules.auth.models import ServiceToken
@@ -27,6 +26,7 @@ from app.testkit import (
     leo_app,
     make_client_app,
     make_role,
+    set_setting,
     unique,
 )
 
@@ -418,7 +418,7 @@ async def test_sin_rol_paciente_503(world):
 
 
 async def test_rate_limit_por_app_llamadora(world):
-    controller._provision_limiter = SlidingWindowLimiter(2, 60)
+    await set_setting(world.session, "rate_limit.provision_per_window", 2)
     headers = await bearer(world)
     assert (await create(world, headers)).status_code == 201
     assert (await create(world, headers)).status_code == 201

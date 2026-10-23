@@ -9,11 +9,16 @@ dependencies = [
     "asyncpg>=0.32.0",
     "cryptography>=50.0.2",
     "fastapi>=0.148.0",
+    "leo-sdk[settings]",
     "pydantic-settings>=2.16.0",
     "python-dotenv>=1.2.4",
     "sqlalchemy[asyncio]>=2.0",
     "uvicorn[standard]>=0.54.0",
 ]
+
+[tool.uv.sources]
+# Modulo compartido de ajustes (`leo_sdk.settings_store`) por ruta local.
+leo-sdk = { path = "../sdk/python", editable = true }
 
 [dependency-groups]
 dev = [

@@ -6,6 +6,7 @@ RFC 9106 "low memory"; el hash guardado es el string PHC completo
 sal. Lo usan la semilla del administrador y, despues, el modulo `users`.
 """
 
+from dataclasses import dataclass
 from functools import lru_cache
 
 from argon2 import PasswordHasher
@@ -15,6 +16,31 @@ MIN_PASSWORD_LENGTH = 12
 MAX_PASSWORD_LENGTH = 128
 
 _hasher = PasswordHasher()
+
+
+@dataclass(frozen=True)
+class PasswordPolicy:
+    """Politica de contrasenas. Los ajustes (`password.*`) pueden subir el
+    minimo o relajar las clases de caracteres, pero la longitud siempre queda
+    entre `MIN_PASSWORD_LENGTH` y `MAX_PASSWORD_LENGTH` (piso/techo de codigo)."""
+
+    min_length: int = MIN_PASSWORD_LENGTH
+    max_length: int = MAX_PASSWORD_LENGTH
+    require_lowercase: bool = True
+    require_uppercase: bool = True
+    require_digit: bool = True
+    require_symbol: bool = True
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "min_length",
+            max(MIN_PASSWORD_LENGTH, min(self.min_length, MAX_PASSWORD_LENGTH)),
+        )
+        object.__setattr__(self, "max_length", MAX_PASSWORD_LENGTH)
+
+
+DEFAULT_POLICY = PasswordPolicy()
 
 
 def hash_password(password: str) -> str:
@@ -49,26 +75,32 @@ def burn_verification_time(password: str) -> None:
 
 
 def password_weaknesses(
-    password: str, *, username: str | None = None, email: str | None = None
+    password: str,
+    *,
+    username: str | None = None,
+    email: str | None = None,
+    policy: PasswordPolicy = DEFAULT_POLICY,
 ) -> list[str]:
     """Motivos (en espanol) por los que la contrasena es debil; [] si es fuerte.
 
-    Fuerte = 12-128 caracteres, con minuscula, mayuscula, digito y simbolo.
-    Decision del usuario (2026-10-22): se permite que contenga el usuario o la
-    parte local del email; `username` y `email` se conservan en la firma por
-    compatibilidad con los llamadores, pero ya no entran en la politica.
+    Por defecto fuerte = 12-128 caracteres, con minuscula, mayuscula, digito y
+    simbolo; `policy` (de los ajustes `password.*`) puede subir el minimo o
+    quitar clases, nunca bajar de 12. Decision del usuario (2026-10-22): se
+    permite que contenga el usuario o la parte local del email; `username` y
+    `email` se conservan en la firma por compatibilidad con los llamadores, pero
+    ya no entran en la politica.
     """
     problems = []
-    if not MIN_PASSWORD_LENGTH <= len(password) <= MAX_PASSWORD_LENGTH:
+    if not policy.min_length <= len(password) <= policy.max_length:
         problems.append(
-            f"debe tener entre {MIN_PASSWORD_LENGTH} y {MAX_PASSWORD_LENGTH} caracteres"
+            f"debe tener entre {policy.min_length} y {policy.max_length} caracteres"
         )
-    if not any(c.islower() for c in password):
+    if policy.require_lowercase and not any(c.islower() for c in password):
         problems.append("debe incluir una minúscula")
-    if not any(c.isupper() for c in password):
+    if policy.require_uppercase and not any(c.isupper() for c in password):
         problems.append("debe incluir una mayúscula")
-    if not any(c.isdigit() for c in password):
+    if policy.require_digit and not any(c.isdigit() for c in password):
         problems.append("debe incluir un dígito")
-    if all(c.isalnum() for c in password):
+    if policy.require_symbol and all(c.isalnum() for c in password):
         problems.append("debe incluir un símbolo")
     return problems

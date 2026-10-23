@@ -10,6 +10,7 @@ from uuid import UUID
 from sqlalchemy import null
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import runtime_settings
 from app.core.audit import Actor, AuditEntry, diff, is_sensitive, json_safe, snapshot
 from app.core.authz import Principal
 from app.core.client_auth import ClientApp
@@ -24,7 +25,6 @@ from app.modules.audit.models import AuditEvent, AuditResult
 from app.modules.audit.repository import AuditFilters
 from app.modules.audit.schemas import AuditEventIngest, AuditEventRead
 
-EXPORT_MAX_ROWS = 50_000
 EXPORT_COLUMNS = (
     "occurred_at",
     "application",
@@ -152,7 +152,8 @@ def _csv_cell(value: object) -> str:
 
 
 async def export_csv(session: AsyncSession, filters: AuditFilters, actor: Actor) -> str:
-    rows = await repository.fetch_for_export(session, filters, EXPORT_MAX_ROWS)
+    max_rows = await runtime_settings.get("audit.export_max_rows")
+    rows = await repository.fetch_for_export(session, filters, max_rows)
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(EXPORT_COLUMNS)

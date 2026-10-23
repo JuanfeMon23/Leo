@@ -33,11 +33,10 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core import clock
+from app.core import clock, runtime_settings
 from app.core.audit import Actor, AuditEntry, diff
 from app.core.authz import Principal
 from app.core.client_auth import ClientApp
-from app.core.config import get_settings
 from app.core.crypto import (
     constant_time_equals,
     new_opaque_token,
@@ -144,31 +143,19 @@ _limiters: LoginLimiters | None = None
 
 
 def login_limiters() -> LoginLimiters:
+    """Limitadores (solo el almacen y el bucket; el limite y la ventana se
+    leen de `settings` en cada llamada, ver `rate_rule` y `failure_rule`)."""
     global _limiters
     if _limiters is None:
-        s = get_settings()
-        lock = s.leo_login_lock_minutes * 60
         _limiters = LoginLimiters(
-            by_ip=make_limiter("login.ip", s.leo_login_rate_limit_per_minute, 60),
-            by_login=make_limiter("login.user", s.leo_login_rate_limit_per_minute, 60),
-            unknown_failures=make_limiter(
-                "login.unknown", s.leo_login_max_failed_attempts, lock
-            ),
-            password_by_ip=make_limiter(
-                "password.ip", s.leo_login_rate_limit_per_minute, 60
-            ),
-            password_by_user=make_limiter(
-                "password.user", s.leo_login_rate_limit_per_minute, 60
-            ),
-            password_failures=make_limiter(
-                "password.failures", s.leo_login_max_failed_attempts, lock
-            ),
-            delegated_by_app=make_limiter(
-                "delegated.app", s.leo_delegated_rate_limit_per_minute, 60
-            ),
-            delegated_by_user=make_limiter(
-                "delegated.user", s.leo_login_rate_limit_per_minute, 60
-            ),
+            by_ip=make_limiter("login.ip"),
+            by_login=make_limiter("login.user"),
+            unknown_failures=make_limiter("login.unknown"),
+            password_by_ip=make_limiter("password.ip"),
+            password_by_user=make_limiter("password.user"),
+            password_failures=make_limiter("password.failures"),
+            delegated_by_app=make_limiter("delegated.app"),
+            delegated_by_user=make_limiter("delegated.user"),
         )
     return _limiters
 
@@ -177,13 +164,31 @@ _service_limiter: SlidingWindowLimiter | None = None
 
 
 def service_token_limiter() -> SlidingWindowLimiter:
-    """Emisiones de tokens de servicio por minuto y por cliente."""
+    """Emisiones de tokens de servicio por ventana y por cliente."""
     global _service_limiter
     if _service_limiter is None:
-        _service_limiter = make_limiter(
-            "service-token", get_settings().leo_service_token_rate_limit_per_minute, 60
-        )
+        _service_limiter = make_limiter("service-token")
     return _service_limiter
+
+
+async def rate_rule(limit_key: str) -> dict[str, int]:
+    """`limit`/`window_seconds` vigentes de un limite de intentos (ajustes
+    `rate_limit.<...>` + `rate_limit.window_seconds`), para pasarlos al
+    limitador en cada llamada."""
+    values = await runtime_settings.get_many(limit_key, "rate_limit.window_seconds")
+    return {"limit": values[limit_key], "window_seconds": values["rate_limit.window_seconds"]}
+
+
+async def failure_rule() -> dict[str, int]:
+    """Regla del bloqueo por fallos: N fallos dentro de la duracion del
+    bloqueo (`auth.login_*`)."""
+    values = await runtime_settings.get_many(
+        "auth.login_max_failed_attempts", "auth.login_lock_minutes"
+    )
+    return {
+        "limit": values["auth.login_max_failed_attempts"],
+        "window_seconds": values["auth.login_lock_minutes"] * 60,
+    }
 
 
 # --- resultados ---
@@ -210,13 +215,16 @@ class TokenOwner:
     last_activity_at: datetime  # ya deslizada si se resolvio con touch
 
 
-def _idle(now: datetime, sso: Session) -> bool:
-    limit = timedelta(minutes=get_settings().leo_idle_timeout_minutes)
-    return now - sso.last_activity_at > limit
+async def _idle_minutes() -> int:
+    return await runtime_settings.get("auth.idle_timeout_minutes")
 
 
-def _idle_seconds() -> int:
-    return get_settings().leo_idle_timeout_minutes * 60
+def _idle(now: datetime, sso: Session, idle_minutes: int) -> bool:
+    return now - sso.last_activity_at > timedelta(minutes=idle_minutes)
+
+
+async def _idle_seconds() -> int:
+    return await _idle_minutes() * 60
 
 
 async def _live_session(
@@ -231,7 +239,7 @@ async def _live_session(
     sso = await repository.get_session(session, session_id)
     if sso is None or sso.revoked_at is not None or sso.expires_at <= now:
         return None
-    if _idle(now, sso):
+    if _idle(now, sso, await _idle_minutes()):
         await repository.revoke_session(
             session, sso.id, SessionRevokedReason.IDLE_TIMEOUT, now
         )
@@ -259,20 +267,24 @@ async def _live_session(
 async def login(
     session: AsyncSession, login_name: str, password: str, jkt: str, meta: RequestMeta
 ) -> LoginResult:
-    settings = get_settings()
     limiters = login_limiters()
     login_key = login_name.strip().lower()
     ip_key = meta.ip or "desconocida"
     now = clock.now()
 
     # check_and_hit: atomico (sin carreras entre peticiones concurrentes).
-    wait = await limiters.by_ip.check_and_hit(ip_key, now)
+    wait = await limiters.by_ip.check_and_hit(
+        ip_key, now, **await rate_rule("rate_limit.login_ip_per_window")
+    )
     if not wait:
-        wait = await limiters.by_login.check_and_hit(login_key, now)
+        wait = await limiters.by_login.check_and_hit(
+            login_key, now, **await rate_rule("rate_limit.login_user_per_window")
+        )
     if wait:
         raise TooManyRequestsError(TOO_MANY_ATTEMPTS, wait)
 
-    wait = await limiters.unknown_failures.retry_after(login_key, now)
+    failures = await failure_rule()
+    wait = await limiters.unknown_failures.retry_after(login_key, now, **failures)
     if wait:
         raise TooManyRequestsError(TOO_MANY_ATTEMPTS, wait)
 
@@ -280,8 +292,8 @@ async def login(
         session,
         login_name,
         password,
-        max_failed_attempts=settings.leo_login_max_failed_attempts,
-        lock_minutes=settings.leo_login_lock_minutes,
+        max_failed_attempts=failures["limit"],
+        lock_minutes=failures["window_seconds"] // 60,
     )
     base = AuditEntry(
         action_tag="leo.auth.login",
@@ -296,7 +308,9 @@ async def login(
     outcome = check.outcome
     if outcome == users.LoginOutcome.INVALID:
         if check.user is None:
-            await limiters.unknown_failures.hit(login_key, now)
+            await limiters.unknown_failures.hit(
+                login_key, now, window_seconds=failures["window_seconds"]
+            )
         base.result, base.reason = "denied", "Credenciales incorrectas."
         await audit.record_and_commit(session, base)
         raise UnauthorizedError(INVALID_CREDENTIALS, code="invalid_credentials")
@@ -323,7 +337,9 @@ async def login(
 
     user = check.user
     assert user is not None
-    expires_at = now + timedelta(hours=settings.leo_session_max_hours)
+    expires_at = now + timedelta(
+        hours=await runtime_settings.get("auth.session_max_hours")
+    )
     cookie = new_opaque_token()
     sso = await repository.add_session(
         session,
@@ -403,7 +419,7 @@ async def me(session: AsyncSession, principal: Principal) -> MeResponse:
             id=sso.id,
             expires_at=sso.expires_at,
             last_activity_at=sso.last_activity_at,
-            idle_timeout_seconds=_idle_seconds(),
+            idle_timeout_seconds=await _idle_seconds(),
         ),
         permissions=sorted(principal.permissions),
         applications=[
@@ -451,13 +467,19 @@ async def _check_password_attempts(who: SelfManager, message: str):
     limiters = login_limiters()
     now = clock.now()
     user_key = str(who.user_id)
-    wait = await limiters.password_failures.retry_after(user_key, now)
+    wait = await limiters.password_failures.retry_after(
+        user_key, now, **await failure_rule()
+    )
     if not wait and who.via is None:
         wait = await limiters.password_by_ip.check_and_hit(
-            who.meta.ip or "desconocida", now
+            who.meta.ip or "desconocida",
+            now,
+            **await rate_rule("rate_limit.password_ip_per_window"),
         )
     if not wait:
-        wait = await limiters.password_by_user.check_and_hit(user_key, now)
+        wait = await limiters.password_by_user.check_and_hit(
+            user_key, now, **await rate_rule("rate_limit.password_user_per_window")
+        )
     if wait:
         raise TooManyRequestsError(message, wait)
     return limiters, now, user_key
@@ -486,7 +508,9 @@ async def _edit_profile(
         if not await users.verify_own_password(
             session, who.user_id, data.current_password
         ):
-            await limiters.password_failures.hit(user_key, now)
+            await limiters.password_failures.hit(
+            user_key, now, window_seconds=(await failure_rule())["window_seconds"]
+        )
             await audit.record_and_commit(
                 session,
                 who.actor.entry(
@@ -526,7 +550,9 @@ async def _change_password(
             session, who.user_id, current_password, new_password, who.actor, who.via
         )
     except UnauthorizedError:
-        await limiters.password_failures.hit(user_key, now)
+        await limiters.password_failures.hit(
+            user_key, now, window_seconds=(await failure_rule())["window_seconds"]
+        )
         await audit.record_and_commit(
             session,
             who.actor.entry(
@@ -604,7 +630,10 @@ async def _delegated_manager(
     sirve. El usuario no puede tener ningun permiso `leo.*` ni rol de Leo
     (cuentas sin privilegios): si no, 403 generico + evento `denied`."""
     limiters = login_limiters()
-    wait = await limiters.delegated_by_app.check_and_hit(str(caller.application_id))
+    wait = await limiters.delegated_by_app.check_and_hit(
+        str(caller.application_id),
+        **await rate_rule("rate_limit.delegated_app_per_window"),
+    )
     if wait:
         raise TooManyRequestsError(TOO_MANY_DELEGATED, wait)
     owner = await _resolve_owner(
@@ -613,7 +642,10 @@ async def _delegated_manager(
     await session.commit()  # revocacion por inactividad, si la hubo
     if owner is None:
         raise _invalid_user_token()
-    wait = await limiters.delegated_by_user.check_and_hit(str(owner.user_id))
+    wait = await limiters.delegated_by_user.check_and_hit(
+        str(owner.user_id),
+        **await rate_rule("rate_limit.delegated_user_per_window"),
+    )
     if wait:
         raise TooManyRequestsError(TOO_MANY_DELEGATED, wait)
     who = SelfManager(
@@ -858,7 +890,7 @@ async def _issue_tokens(
     now: datetime,
     family_id: UUID | None,
 ) -> tuple[TokenResponse, Token]:
-    access_minutes = get_settings().leo_access_token_minutes
+    access_minutes = await runtime_settings.get("auth.access_token_minutes")
     access_exp = min(now + timedelta(minutes=access_minutes), sso.expires_at)
     access, refresh = new_opaque_token(), new_opaque_token()
     await repository.add_token(
@@ -1072,7 +1104,9 @@ async def issue_service_token(
     now = clock.now()
     limiter = service_token_limiter()
     key = str(client.id)
-    wait = await limiter.check_and_hit(key, now)
+    wait = await limiter.check_and_hit(
+        key, now, **await rate_rule("rate_limit.service_token_per_window")
+    )
     if wait:
         raise TooManyRequestsError(
             "Demasiadas solicitudes de token de servicio. Intenta de nuevo más tarde.",
@@ -1108,7 +1142,10 @@ async def issue_service_token(
                 code="access_denied",
             ),
         )
-    minutes = min(get_settings().leo_service_token_minutes, SERVICE_TOKEN_MAX_MINUTES)
+    minutes = min(
+        await runtime_settings.get("auth.service_token_minutes"),
+        SERVICE_TOKEN_MAX_MINUTES,
+    )
     expires_at = now + timedelta(minutes=minutes)
     token = new_opaque_token()
     await repository.add_service_token(
@@ -1236,7 +1273,7 @@ async def introspect(
         session_id=owner.session_id,
         client_id=client.client_id,
         exp=int(owner.token.expires_at.timestamp()),
-        idle_timeout_seconds=_idle_seconds(),
+        idle_timeout_seconds=await _idle_seconds(),
         applications=[
             MeApplication(slug=a.slug, name=a.name, base_url=a.base_url) for a in apps
         ],

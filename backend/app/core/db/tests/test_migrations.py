@@ -352,3 +352,38 @@ async def test_0005_admite_password_change_y_el_downgrade_lo_reasigna_a_admin(
                     text("DELETE FROM users WHERE id = :u"), {"u": user_id}
                 )
     assert await _schema_diff(engine) == []
+
+
+async def test_0008_sube_y_baja_ajustes_con_su_historial(engine: AsyncEngine) -> None:
+    """`0008` solo agrega `settings` y `settings_history` (con sus triggers);
+    el downgrade las quita con sus filas y volver a subir las recrea."""
+    new_tables = {"settings", "settings_history"}
+    alembic("downgrade", "0007")
+    try:
+        assert not new_tables & await _public_tables(engine)
+        alembic("upgrade", "head")
+        async with engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "INSERT INTO settings (key, value, value_type, default_value, "
+                    "group_name, description) VALUES ('a.b', '1', 'int', '1', "
+                    "'g', 'd')"
+                )
+            )
+        alembic("downgrade", "0007")
+        assert not new_tables & await _public_tables(engine)
+    finally:
+        alembic("upgrade", "head")
+    assert new_tables <= await _public_tables(engine)
+    async with engine.connect() as connection:
+        rows = (await connection.execute(text("SELECT count(*) FROM settings"))).scalar_one()
+        triggers = (
+            await connection.execute(
+                text(
+                    "SELECT count(*) FROM pg_trigger WHERE tgrelid = "
+                    "'settings_history'::regclass AND NOT tgisinternal"
+                )
+            )
+        ).scalar_one()
+    assert (rows, triggers) == (0, 2)
+    assert await _schema_diff(engine) == []

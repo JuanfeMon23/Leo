@@ -6,7 +6,8 @@
 --   leo_app       lo que usa la API (DATABASE_URL): SELECT/INSERT/UPDATE/DELETE
 --                 sobre las tablas, USAGE en las secuencias. Sin DDL, sin
 --                 TRUNCATE, sin acceso a alembic_version; sobre audit_events
---                 (append-only) solo SELECT e INSERT. Sin superusuario.
+--                 y settings_history (append-only) solo SELECT e INSERT;
+--                 sobre settings SELECT/INSERT/UPDATE (sin DELETE). Sin superusuario.
 --
 -- Correr como superusuario (o un rol que pueda crear roles y cambiar duenios),
 -- conectado a la BD de Leo:
@@ -87,6 +88,16 @@ BEGIN
     IF to_regclass('public.audit_events') IS NOT NULL THEN
         REVOKE ALL ON TABLE public.audit_events FROM leo_app;
         GRANT SELECT, INSERT ON TABLE public.audit_events TO leo_app;
+    END IF;
+    -- Historial de ajustes: append-only (solo leer y agregar).
+    IF to_regclass('public.settings_history') IS NOT NULL THEN
+        REVOKE ALL ON TABLE public.settings_history FROM leo_app;
+        GRANT SELECT, INSERT ON TABLE public.settings_history TO leo_app;
+    END IF;
+    -- Ajustes vigentes: se editan pero no se borran.
+    IF to_regclass('public.settings') IS NOT NULL THEN
+        REVOKE ALL ON TABLE public.settings FROM leo_app;
+        GRANT SELECT, INSERT, UPDATE ON TABLE public.settings TO leo_app;
     END IF;
     IF to_regclass('public.alembic_version') IS NOT NULL THEN
         REVOKE ALL ON TABLE public.alembic_version FROM leo_app;

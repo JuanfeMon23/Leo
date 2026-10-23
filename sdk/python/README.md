@@ -83,11 +83,22 @@ async def things(p: Annotated[LeoUser, auth.require_action("miapp.things.view")]
     return {"caller": p.client_id if p.principal_type == "service" else p.username}
 ```
 
+## Ajustes editables (`leo_sdk.settings_store`, extra opcional)
+
+`pip install "leo-sdk[settings]"` (o `leo-sdk[settings] @ ../sdk/python` con uv). Requiere PostgreSQL y SQLAlchemy async. Pasos para una app:
+
+1. Declarar las claves: `registry = SettingsRegistry([SettingDef("auth.max_x", "int", 5, "Descripción", min=1, max=20, unit="count", group="auth"), ...])`.
+2. Modelos sobre su `Base`: `models = make_settings_models(Base, user_pk="users.id")` (importarlos en el registro de modelos de Alembic).
+3. En una migración Alembic propia: `from leo_sdk.settings_store import migration` y `migration.upgrade(op)` / `migration.downgrade(op)` (crea las dos tablas y el trigger append-only).
+4. `store = SettingsStore(registry, session_factory, models)`; al arrancar `await store.sync_registry(initial_values)`; leer con `await store.get("auth.max_x")`.
+5. Montar `build_settings_router(store, SettingsRouterDeps(view_dep=..., edit_dep=..., edit_security_dep=..., audit=...))` bajo el prefijo que quiera la app.
+
 ## Desarrollo
 
 ```
 uv sync
 uv run pytest -q          # unitarias + E2E contra la app real de Leo
+uv run pytest tests/settings_store -q   # solo el módulo de ajustes (crea la BD leo_sdk_settings_test)
 uv run ruff check .
 uv run ruff format --check .
 ```

@@ -4,11 +4,12 @@ de produccion: solo lo importan los tests y `app/conftest.py`.
 """
 
 import base64
+import json
 from typing import Any
 from uuid import UUID, uuid4
 
 from httpx import AsyncClient, Response
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.crypto import new_opaque_token, sha256_b64url
@@ -27,6 +28,18 @@ PUBLIC_URL = "https://leo.test"
 FRONTEND_URL = "https://admin.leo.test"
 STRONG_PASSWORD = "Clave-Segura-2026!"
 COOKIE = "__Host-leo_session"
+
+
+async def set_setting(session: AsyncSession, key: str, value: Any) -> None:
+    """Fija un ajuste directamente en la BD del test (valor dentro del rango
+    de la fila) e invalida su cache: el siguiente `get` lo ve sin reiniciar."""
+    from app.core import runtime_settings
+
+    await session.execute(
+        text("UPDATE settings SET value = CAST(:value AS jsonb) WHERE key = :key"),
+        {"key": key, "value": json.dumps(value)},
+    )
+    runtime_settings.store.invalidate(key)
 
 
 def unique(prefix: str) -> str:
