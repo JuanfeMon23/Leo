@@ -1,3 +1,4 @@
+import { applicationErrorMessage } from '../utils/applicationErrors'
 import type { ApplicationCreated, ApplicationRead, ApplicationSecretReveal } from '../types/applications'
 
 /**
@@ -12,17 +13,17 @@ export function useApplicationsAppActions(onChanged: () => unknown) {
 
   const reveal = ref<ApplicationSecretReveal | null>(null)
 
-  const toggle = useApplicationsConfirm(async (app: ApplicationRead) => {
+  const toggle = useConfirmAction(async (app: ApplicationRead) => {
     const nextActive = !app.is_active
     await api.setActive(app.id, nextActive)
     toast.success(nextActive ? `Aplicación «${app.name}» activada.` : `Aplicación «${app.name}» desactivada.`)
     await onChanged()
-  })
+  }, { mapError: applicationErrorMessage })
 
-  const rotate = useApplicationsConfirm(async (app: ApplicationRead) => {
+  const rotate = useConfirmAction(async (app: ApplicationRead) => {
     const rotated = await api.rotateSecret(app.id)
     reveal.value = { clientId: rotated.client_id, secret: rotated.client_secret, reason: 'rotated' }
-  })
+  }, { mapError: applicationErrorMessage })
 
   function revealCreated(created: ApplicationCreated) {
     reveal.value = { clientId: created.application.client_id, secret: created.client_secret, reason: 'created' }

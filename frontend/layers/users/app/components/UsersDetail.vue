@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { UserRead, UserRoleRead } from '../types/users'
+import { userErrorMessage } from '../utils/userErrors'
 import { usersDocument, usersFormatDateTime, usersFullName, usersIsLocked } from '../utils/userDisplay'
 import { USERS_DOCUMENT_LABELS } from '../utils/userSchemas'
 
@@ -28,24 +29,24 @@ const locked = computed(() => (user.value ? usersIsLocked(user.value) : false))
 const editOpen = ref(false)
 const resetOpen = ref(false)
 
-const toggle = useUsersConfirm(async (target: UserRead) => {
+const toggle = useConfirmAction(async (target: UserRead) => {
   const next = !target.is_active
   await api.setActive(target.id, next)
   toast.success(next ? `Usuario «${usersFullName(target)}» activado.` : `Usuario «${usersFullName(target)}» desactivado. Sus sesiones se cerraron.`)
   await detail.refresh()
-})
+}, { mapError: userErrorMessage })
 
-const unlock = useUsersConfirm(async (target: UserRead) => {
+const unlock = useConfirmAction(async (target: UserRead) => {
   await api.unlock(target.id)
   toast.success(`Usuario «${usersFullName(target)}» desbloqueado.`)
   await detail.refresh()
-})
+}, { mapError: userErrorMessage })
 
-const removal = useUsersConfirm(async (role: UserRoleRead) => {
+const removal = useConfirmAction(async (role: UserRoleRead) => {
   const updated = await api.removeRole(props.id, role.id)
   toast.success(`Rol «${role.name}» quitado.`)
   await detail.applyDetail(updated)
-})
+}, { mapError: userErrorMessage })
 
 const deactivating = computed(() => toggle.target?.is_active ?? true)
 </script>
