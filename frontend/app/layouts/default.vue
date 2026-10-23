@@ -7,6 +7,7 @@ const canViewUsers = useCan('leo.users.view')
 const canViewRoles = useCan('leo.roles.view')
 const canViewAudit = useCan('leo.audit.view')
 const canViewSessions = useCan('leo.auth.view')
+const canViewSettings = useCan('leo.settings.view')
 const menu = computed<UiSidebarItem[]>(() => [
   ...(canViewApplications.value
     ? [{
@@ -46,6 +47,14 @@ const menu = computed<UiSidebarItem[]>(() => [
         to: '/audit',
         // Documento con líneas (trazo, 24×24).
         icon: 'M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h5'
+      }]
+    : []),
+  ...(canViewSettings.value
+    ? [{
+        label: 'Ajustes',
+        to: '/ajustes',
+        // Controles deslizantes (trazo, 24×24).
+        icon: 'M4 7h8M16 7h4M4 17h4M12 17h8M14 4v6M10 14v6'
       }]
     : [])
 ])

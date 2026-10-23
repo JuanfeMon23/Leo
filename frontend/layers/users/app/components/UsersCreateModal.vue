@@ -12,8 +12,9 @@ const open = defineModel<boolean>('open', { required: true })
 const emit = defineEmits<{ saved: [value: UserRead] }>()
 
 const api = useUsersApi()
+const { policy } = usePasswordPolicy()
 
-const form = useZodForm(userCreateSchema, {
+const form = useZodForm(userCreateSchema(() => policy.value), {
   initialValues: () => ({
     username: '', email: '', first_name: '', last_name: '', document_type: '', document_number: '', password: ''
   }),
@@ -21,7 +22,7 @@ const form = useZodForm(userCreateSchema, {
 })
 watch(open, (isOpen) => { if (!isOpen) form.reset() })
 
-const values = form.values as { username?: string, email?: string, password?: string }
+const values = form.values as { password?: string }
 
 const onSubmit = form.submit(async (v) => {
   const saved = await api.create(v)
@@ -47,6 +48,6 @@ const onSubmit = form.submit(async (v) => {
     <UiFormField name="password" label="Contraseña inicial" required>
       <UiPasswordInput autocomplete="new-password" />
     </UiFormField>
-    <UiPasswordRequirements :password="values.password ?? ''" :username="values.username" :email="values.email" />
+    <UiPasswordRequirements :password="values.password ?? ''" :policy="policy" />
   </UiFormModal>
 </template>

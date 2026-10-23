@@ -15,8 +15,9 @@ const emit = defineEmits<{ saved: [value: UserRead] }>()
 
 const api = useUsersApi()
 const toast = useToast()
+const { policy } = usePasswordPolicy()
 
-const form = useZodForm(passwordResetSchema({ username: props.user.username, email: props.user.email }), {
+const form = useZodForm(passwordResetSchema(() => policy.value), {
   initialValues: () => ({ password: '' }),
   resetOn: open
 })
@@ -47,6 +48,6 @@ const onSubmit = form.submit(async (v) => {
     <UiFormField name="password" label="Contraseña nueva" required>
       <UiPasswordInput autocomplete="new-password" />
     </UiFormField>
-    <UiPasswordRequirements :password="values.password ?? ''" :username="user.username" :email="user.email" />
+    <UiPasswordRequirements :password="values.password ?? ''" :policy="policy" />
   </UiFormModal>
 </template>

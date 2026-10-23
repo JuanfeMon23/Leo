@@ -2,8 +2,8 @@ import { z } from 'zod'
 import { zRequiredEnum, zRequiredText } from '#andromeda/utils/zodFields'
 import { zEmail } from '../../../../app/utils/email'
 import { USERS_DOCUMENT_TYPES } from '../types/users'
-import type { PasswordContext } from '../../../../app/utils/password'
-import { passwordProblems } from '../../../../app/utils/password'
+import type { PasswordPolicy } from '#andromeda/utils/passwordPolicy'
+import { zLazyPassword } from '../../../../app/utils/lazyPassword'
 
 // Mismos patrones que el backend (modules/users/models.py).
 export const USERS_USERNAME_REGEX = /^[a-z0-9]([a-z0-9._-]{1,62})[a-z0-9]$/
@@ -47,29 +47,18 @@ const personFields = {
   last_name: zRequiredText('Los apellidos son obligatorios.', 100)
 }
 
-const zPassword = () =>
-  z.string({ required_error: 'La contraseña es obligatoria.' }).min(1, 'La contraseña es obligatoria.')
-
-function checkPassword(password: string, ctx: PasswordContext, issue: z.RefinementCtx) {
-  if (!password) return
-  const problems = passwordProblems(password, ctx)
-  if (problems.length) {
-    const lower = problems.map(p => p.charAt(0).toLowerCase() + p.slice(1))
-    issue.addIssue({ code: 'custom', path: ['password'], message: `Falta: ${lower.join('; ')}.` })
-  }
+/** Alta de usuario; la política de contraseña se lee en cada validación (la del servidor). */
+export function userCreateSchema(policy: () => PasswordPolicy) {
+  return z.object({ username: zUsername, ...personFields, password: zLazyPassword(policy, { required: 'La contraseña es obligatoria.' }) })
 }
-
-export const userCreateSchema = z
-  .object({ username: zUsername, ...personFields, password: zPassword() })
-  .superRefine((v, issue) => checkPassword(v.password, { username: v.username, email: v.email }, issue))
 
 /** El usuario (login) es inmutable y la contraseña se cambia aparte: no forman parte de la edición. */
 export const userEditSchema = z.object(personFields)
 
-/** Reseteo de contraseña: la política depende del usuario al que se le asigna. */
-export function passwordResetSchema(ctx: PasswordContext) {
-  return z.object({ password: zPassword() }).superRefine((v, issue) => checkPassword(v.password, ctx, issue))
+/** Reseteo de contraseña por un administrador: misma política que el alta. */
+export function passwordResetSchema(policy: () => PasswordPolicy) {
+  return z.object({ password: zLazyPassword(policy, { required: 'La contraseña es obligatoria.' }) })
 }
 
-export type UserCreateInput = z.input<typeof userCreateSchema>
+export type UserCreateInput = z.input<ReturnType<typeof userCreateSchema>>
 export type UserEditInput = z.input<typeof userEditSchema>

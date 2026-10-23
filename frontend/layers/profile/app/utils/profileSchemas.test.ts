@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { PasswordPolicy } from '#andromeda/utils/passwordPolicy'
 import { passwordChangeSchema, profileFormSchema, profileSchema } from './profileSchemas'
 
 type Parser = { safeParse: (v: unknown) => { success: boolean, error?: { issues: { path: (string | number)[], message: string }[] } } }
@@ -30,8 +31,13 @@ describe('profileSchema', () => {
   })
 })
 
+const STRICT: PasswordPolicy = {
+  min_length: 12, max_length: 128, require_lowercase: true, require_uppercase: true, require_digit: true, require_symbol: true
+}
+
 describe('passwordChangeSchema', () => {
-  const schema = passwordChangeSchema({ username: 'ana.perez', email: 'ana@x.co' })
+  let policy = STRICT
+  const schema = passwordChangeSchema(() => policy)
   const valid = { current_password: 'Vieja-Clave-2025', new_password: 'Segura-Clave-2026', confirm_password: 'Segura-Clave-2026' }
 
   it('acepta una contraseña que cumple la política y coincide', () => {
@@ -46,7 +52,15 @@ describe('passwordChangeSchema', () => {
   })
 
   it('una contraseña débil dice qué falta', () => {
-    expect(issues(schema, { ...valid, new_password: 'corta', confirm_password: 'corta' }).new_password).toMatch(/^Falta:/)
+    expect(issues(schema, { ...valid, new_password: 'corta', confirm_password: 'corta' }).new_password).toMatch(/requisitos/)
+  })
+
+  it('usa la política vigente del servidor al validar (más laxa o más estricta)', () => {
+    policy = { ...STRICT, min_length: 4, require_uppercase: false, require_digit: false, require_symbol: false }
+    expect(issues(schema, { ...valid, new_password: 'corta', confirm_password: 'corta' }).new_password).toBeUndefined()
+    policy = { ...STRICT, min_length: 20 }
+    expect(issues(schema, valid).new_password).toMatch(/requisitos/)
+    policy = STRICT
   })
 
   it('puede contener el usuario o la parte local del correo (ya no está prohibido)', () => {

@@ -3,6 +3,7 @@ import { enableAutoUnmount, flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LeoApiError } from '#leo-client/lib/errors'
 import { ALL_USERS_TAGS, signInWith } from '../../../../tests/helpers/session'
+import { clearPasswordPolicyCache } from '../../../../app/composables/usePasswordPolicy'
 import UsersCreateModal from './UsersCreateModal.vue'
 
 enableAutoUnmount(afterEach)
@@ -14,6 +15,7 @@ const saved = { id: 'u9', username: 'ana.perez' }
 
 beforeEach(() => {
   api.mockReset()
+  clearPasswordPolicyCache()
   signInWith(ALL_USERS_TAGS)
 })
 afterEach(() => { document.body.innerHTML = '' })
@@ -55,8 +57,8 @@ describe('UsersCreateModal', () => {
     await fill({ number: '1.234.567', password: 'corta' })
     submit()
     await vi.waitFor(() => expect(document.body.textContent).toContain('sin puntos ni espacios'))
-    expect(document.body.textContent).toContain('Falta:')
-    expect(api).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain('aún no cumple todos los requisitos')
+    expect(api.mock.calls.filter(c => c[0] !== '/auth/password-policy')).toEqual([])
   })
 
   it('el número de documento con letras se envía en mayúsculas y el usuario en minúsculas', async () => {
@@ -64,7 +66,7 @@ describe('UsersCreateModal', () => {
     const wrapper = await mountSuspended(UsersCreateModal, { props: { open: true }, attachTo: document.body })
     await fill({ username: 'Ana.Perez', number: 'ab-12' })
     submit()
-    await vi.waitFor(() => expect(api).toHaveBeenCalled())
+    await vi.waitFor(() => expect(api).toHaveBeenCalledWith(expect.stringContaining('/users'), expect.anything()))
     await flushPromises()
     expect(api).toHaveBeenCalledWith('/users', {
       method: 'POST',
