@@ -83,3 +83,33 @@ describe('isSessionError', () => {
     expect(isSessionError(new Error('x'))).toBe(false)
   })
 })
+
+describe('leoErrorMessage: 422 de page_size', () => {
+  const err = (details: unknown, message = 'Hay datos inválidos en la solicitud.') =>
+    new LeoApiError(422, 'validation_error', message, details)
+
+  it('forma Incubus (details objeto): usa el message legible del backend', () => {
+    expect(leoErrorMessage(err({ field: 'page_size', max: 50 }, 'El tamaño de página máximo permitido es 50.')))
+      .toBe('El tamaño de página máximo permitido es 50.')
+  })
+
+  it('forma Leo/Vladimir (details lista): máximo desde max', () => {
+    expect(leoErrorMessage(err([{ field: 'page_size', message: 'x', max: 100 }])))
+      .toBe('Se pidieron demasiados registros por página: el máximo permitido es 100.')
+  })
+
+  it('forma lista: máximo desde el final del texto', () => {
+    expect(leoErrorMessage(err([{ field: 'page_size', message: 'Input should be less than or equal to 50' }])))
+      .toContain('es 50.')
+  })
+
+  it('sin máximo conocido no inventa cifra', () => {
+    expect(leoErrorMessage(err([{ field: 'page_size', message: 'raro' }])))
+      .toBe('Se pidieron demasiados registros por página.')
+  })
+
+  it('otros 422 siguen mostrando el message del backend', () => {
+    expect(leoErrorMessage(err([{ field: 'name', message: 'x' }], 'Algunos datos no son válidos.')))
+      .toBe('Algunos datos no son válidos.')
+  })
+})

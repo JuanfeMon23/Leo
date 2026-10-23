@@ -87,8 +87,33 @@ export function isSessionError(err: unknown): err is LeoApiError {
  * `toUserMessage` de Andromeda.
  */
 export function leoErrorMessage(err: unknown): string {
+  if (err instanceof LeoApiError) {
+    const pageSize = pageSizeMessage(err)
+    if (pageSize) return pageSize
+  }
   if (err instanceof LeoApiError && err.status < 500 && err.message) {
     return toUserMessage({ code: err.code, message: err.message })
   }
   return toUserMessage(err)
+}
+
+/**
+ * 422 de `page_size` (tope configurable en el backend, `pagination.max_page_size`).
+ * Dos formas: `details: {field:'page_size', max}` con `message` ya legible
+ * (Incubus), o `details: [{field:'page_size', message, max?}]` con un resumen
+ * genérico (Leo/Vladimir), donde el máximo se toma de `max` o del final del texto.
+ */
+function pageSizeMessage(err: LeoApiError): string | null {
+  if (err.status !== 422 || err.code !== 'validation_error') return null
+  type Detail = { field?: unknown, message?: unknown, max?: unknown }
+  const isObject = !Array.isArray(err.details) && err.details && typeof err.details === 'object'
+  const hit = (Array.isArray(err.details) ? (err.details as Detail[]).find(d => d?.field === 'page_size') : null)
+    ?? (isObject && (err.details as Detail).field === 'page_size' ? (err.details as Detail) : null)
+  if (!hit) return null
+  if (isObject && err.message) return err.message
+  const text = typeof hit.message === 'string' ? /(\d+)\.?\s*$/.exec(hit.message)?.[1] : undefined
+  const max = Number(hit.max ?? text)
+  return Number.isFinite(max) && max > 0
+    ? `Se pidieron demasiados registros por página: el máximo permitido es ${max}.`
+    : 'Se pidieron demasiados registros por página.'
 }
