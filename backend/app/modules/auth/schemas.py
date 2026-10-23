@@ -231,3 +231,14 @@ class IntrospectResponse(BaseModel):
         default=None,
         description="Actividad de la sesión ya deslizada por esta introspección.",
     )
+
+
+class PasswordPolicyRead(BaseModel):
+    """Politica de contrasenas vigente (publica; solo reglas, sin datos de nadie)."""
+
+    min_length: int = Field(description="Longitud minima (ajuste, 12-32).")
+    max_length: int = Field(description="Longitud maxima (fija, 128).")
+    require_lowercase: bool
+    require_uppercase: bool
+    require_digit: bool
+    require_symbol: bool

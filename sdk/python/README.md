@@ -105,3 +105,15 @@ uv run ruff format --check .
 
 Los tests E2E (`tests/e2e/`) importan `backend/app` solo como dependencia de prueba y usan la
 base `leo_test`; leen `DATABASE_URL` del entorno o de `backend/.env` (sin esa variable se omiten).
+
+## Política de contraseñas
+
+Endpoint público de Leo, sin credenciales (útil para validar antes de enviar):
+
+```python
+policy = await client.password_policy()  # PasswordPolicy; caché en memoria de 30 s
+policy.check("abc")  # ["too_short", "no_uppercase", "no_digit", "no_symbol"]
+policy.is_valid("Clave-Segura-2026!")  # True
+```
+
+Códigos: `too_short`, `too_long`, `no_lowercase`, `no_uppercase`, `no_digit`, `no_symbol`.

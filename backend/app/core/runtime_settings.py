@@ -177,6 +177,13 @@ LEO_SETTINGS = SettingsRegistry(
             300,
             "Altas de pacientes por ventana y por aplicación llamadora.",
         ),
+        _rate(
+            "rate_limit.public_policy_per_window",
+            60,
+            10,
+            600,
+            "Consultas de la política de contraseñas (pública) por ventana y por IP.",
+        ),
         SettingDef(
             "password.min_length",
             "int",

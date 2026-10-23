@@ -36,6 +36,7 @@ from app.modules.auth.schemas import (
     LoginRequest,
     MeResponse,
     PasswordChange,
+    PasswordPolicyRead,
     ServiceTokenResponse,
     SessionRead,
     TokenCheck,
@@ -90,6 +91,21 @@ async def login(
     _set_session_cookie(response, result.cookie_value, result.cookie_max_age)
     response.headers.update(NO_STORE)
     return result.me
+
+
+@router.get(
+    "/password-policy",
+    response_model=PasswordPolicyRead,
+    responses=error_responses(429),
+    summary="Política de contraseñas vigente (pública, sin sesión)",
+    description="Reglas actuales (ajustes `password.*`) para validar en el "
+    "cliente antes de enviar; el servidor las vuelve a aplicar. Sin datos "
+    "sensibles. Cacheable 30 s; limitado por IP (`rate_limit.public_policy_per_window`).",
+)
+async def password_policy(meta: Meta, response: Response) -> PasswordPolicyRead:
+    policy = await controller.public_password_policy(meta)
+    response.headers["Cache-Control"] = "public, max-age=30"
+    return PasswordPolicyRead.model_validate(policy.model_dump())
 
 
 @router.post(

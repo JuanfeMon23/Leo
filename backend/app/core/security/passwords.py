@@ -6,11 +6,13 @@ RFC 9106 "low memory"; el hash guardado es el string PHC completo
 sal. Lo usan la semilla del administrador y, despues, el modulo `users`.
 """
 
-from dataclasses import dataclass
 from functools import lru_cache
+from typing import Any
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
+from leo_sdk.models import PasswordPolicy as SdkPasswordPolicy
+from pydantic import model_validator
 
 MIN_PASSWORD_LENGTH = 12
 MAX_PASSWORD_LENGTH = 128
@@ -18,26 +20,25 @@ MAX_PASSWORD_LENGTH = 128
 _hasher = PasswordHasher()
 
 
-@dataclass(frozen=True)
-class PasswordPolicy:
-    """Politica de contrasenas. Los ajustes (`password.*`) pueden subir el
+class PasswordPolicy(SdkPasswordPolicy):
+    """Politica de contrasenas. Las reglas viven en `leo_sdk.models`; aqui solo
+    se fija el piso/techo de codigo: los ajustes (`password.*`) pueden subir el
     minimo o relajar las clases de caracteres, pero la longitud siempre queda
-    entre `MIN_PASSWORD_LENGTH` y `MAX_PASSWORD_LENGTH` (piso/techo de codigo)."""
+    entre `MIN_PASSWORD_LENGTH` y `MAX_PASSWORD_LENGTH`."""
 
-    min_length: int = MIN_PASSWORD_LENGTH
-    max_length: int = MAX_PASSWORD_LENGTH
-    require_lowercase: bool = True
-    require_uppercase: bool = True
-    require_digit: bool = True
-    require_symbol: bool = True
-
-    def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "min_length",
-            max(MIN_PASSWORD_LENGTH, min(self.min_length, MAX_PASSWORD_LENGTH)),
-        )
-        object.__setattr__(self, "max_length", MAX_PASSWORD_LENGTH)
+    @model_validator(mode="before")
+    @classmethod
+    def _clamp_length(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            minimum = data.get("min_length", MIN_PASSWORD_LENGTH)
+            data = {
+                **data,
+                "min_length": max(
+                    MIN_PASSWORD_LENGTH, min(minimum, MAX_PASSWORD_LENGTH)
+                ),
+                "max_length": MAX_PASSWORD_LENGTH,
+            }
+        return data
 
 
 DEFAULT_POLICY = PasswordPolicy()
@@ -74,6 +75,14 @@ def burn_verification_time(password: str) -> None:
     verify_password(_dummy_hash(), password)
 
 
+_MESSAGES = {
+    "no_lowercase": "debe incluir una minúscula",
+    "no_uppercase": "debe incluir una mayúscula",
+    "no_digit": "debe incluir un dígito",
+    "no_symbol": "debe incluir un símbolo",
+}
+
+
 def password_weaknesses(
     password: str,
     *,
@@ -90,17 +99,11 @@ def password_weaknesses(
     `email` se conservan en la firma por compatibilidad con los llamadores, pero
     ya no entran en la politica.
     """
+    codes = policy.check(password)
     problems = []
-    if not policy.min_length <= len(password) <= policy.max_length:
+    if "too_short" in codes or "too_long" in codes:
         problems.append(
             f"debe tener entre {policy.min_length} y {policy.max_length} caracteres"
         )
-    if policy.require_lowercase and not any(c.islower() for c in password):
-        problems.append("debe incluir una minúscula")
-    if policy.require_uppercase and not any(c.isupper() for c in password):
-        problems.append("debe incluir una mayúscula")
-    if policy.require_digit and not any(c.isdigit() for c in password):
-        problems.append("debe incluir un dígito")
-    if policy.require_symbol and all(c.isalnum() for c in password):
-        problems.append("debe incluir un símbolo")
+    problems.extend(_MESSAGES[code] for code in codes if code in _MESSAGES)
     return problems
