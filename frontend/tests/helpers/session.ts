@@ -1,17 +1,5 @@
-import { useState } from '#imports'
-
-/** Deja una sesión autenticada con los tags dados (para pruebas de componentes con `LeoCan`/`useCan`). */
-export function signInWith(permissions: string[]) {
-  useState('leo-session').value = {
-    status: 'authenticated',
-    me: {
-      user: { id: 'u1', username: 'ana', email: 'a@x.co', first_name: 'Ana', last_name: 'Pérez' },
-      session: { id: 's', expires_at: '', last_activity_at: '', idle_timeout_seconds: 0 },
-      permissions,
-      applications: []
-    }
-  }
-}
+// `signInWith` vive en leo-client; se re-exporta para que las pruebas lo sigan importando de aquí.
+export { signInWith } from '#leo-client/testing/session'
 
 export const ALL_APPLICATIONS_TAGS = [
   'leo.applications.view',

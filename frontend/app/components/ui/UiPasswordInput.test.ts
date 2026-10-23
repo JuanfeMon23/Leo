@@ -2,7 +2,7 @@ import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { enableAutoUnmount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick } from 'vue'
-import UiPasswordInput from './UiPasswordInput.vue'
+import UiPasswordInput from '#andromeda/components/ui/UiPasswordInput.vue'
 
 enableAutoUnmount(afterEach)
 

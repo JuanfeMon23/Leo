@@ -58,12 +58,12 @@ function openEditModule(module: ApplicationModuleRead) {
   moduleFormOpen.value = true
 }
 
-const moduleToggle = useApplicationsConfirm(async (module: ApplicationModuleWithActions) => {
+const moduleToggle = useConfirmAction(async (module: ApplicationModuleWithActions) => {
   const next = !module.is_active
   await api.setModuleActive(props.id, module.id, next)
   toast.success(next ? `Módulo «${module.name}» activado.` : `Módulo «${module.name}» desactivado.`)
   await load()
-})
+}, { mapError: applicationErrorMessage })
 
 // --- acciones ---
 const actionFormOpen = ref(false)
@@ -82,12 +82,12 @@ function openEditAction(module: ApplicationModuleWithActions, action: Applicatio
   actionFormOpen.value = true
 }
 
-const actionToggle = useApplicationsConfirm(async (action: ApplicationActionRead) => {
+const actionToggle = useConfirmAction(async (action: ApplicationActionRead) => {
   const next = !action.is_active
   await api.setActionActive(props.id, action.id, next)
   toast.success(next ? `Acción «${action.name}» activada.` : `Acción «${action.name}» desactivada.`)
   await load()
-})
+}, { mapError: applicationErrorMessage })
 
 const asApplication = computed<ApplicationRead | null>(() => detail.value)
 </script>

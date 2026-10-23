@@ -10,14 +10,10 @@ export function useSessionsRevoke(onChanged: () => unknown) {
   const toast = useToast()
 
   return useConfirmAction<SessionRead>(async (session) => {
-    try {
-      await api.revoke(session.id)
-    } catch (err) {
-      throw new Error(leoErrorMessage(err))
-    }
+    await api.revoke(session.id)
     toast.success(session.is_current ? 'Cerraste tu propia sesión.' : 'Sesión revocada.')
     await onChanged()
-  })
+  }, { mapError: leoErrorMessage })
 }
 
 export type SessionsRevoke = ReturnType<typeof useSessionsRevoke>
