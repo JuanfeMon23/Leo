@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TokenSet(BaseModel):
@@ -138,3 +138,41 @@ class UserProfile(BaseModel):
     last_name: str
     email: str
     username: str
+
+
+class PasswordPolicy(BaseModel):
+    """Politica de contrasenas de Leo (`GET /auth/password-policy`, publica).
+
+    Es la unica implementacion de las reglas: el backend de Leo la reutiliza.
+    `check` devuelve los codigos de requisitos incumplidos.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    min_length: int = 12
+    max_length: int = 128
+    require_lowercase: bool = True
+    require_uppercase: bool = True
+    require_digit: bool = True
+    require_symbol: bool = True
+
+    def check(self, password: str) -> list[str]:
+        """Codigos incumplidos: `too_short`, `too_long`, `no_lowercase`,
+        `no_uppercase`, `no_digit`, `no_symbol`; `[]` si la cumple."""
+        problems = []
+        if len(password) < self.min_length:
+            problems.append("too_short")
+        if len(password) > self.max_length:
+            problems.append("too_long")
+        if self.require_lowercase and not any(c.islower() for c in password):
+            problems.append("no_lowercase")
+        if self.require_uppercase and not any(c.isupper() for c in password):
+            problems.append("no_uppercase")
+        if self.require_digit and not any(c.isdigit() for c in password):
+            problems.append("no_digit")
+        if self.require_symbol and all(c.isalnum() for c in password):
+            problems.append("no_symbol")
+        return problems
+
+    def is_valid(self, password: str) -> bool:
+        return not self.check(password)

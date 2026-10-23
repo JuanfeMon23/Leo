@@ -21,7 +21,14 @@ from leo_sdk.errors import (
     TooManyAttemptsError,
 )
 from leo_sdk.fastapi import LeoAuth, leo_router
-from leo_sdk.models import Introspection, LeoUser, ServiceToken, TokenSet, UserProfile
+from leo_sdk.models import (
+    Introspection,
+    LeoUser,
+    PasswordPolicy,
+    ServiceToken,
+    TokenSet,
+    UserProfile,
+)
 from leo_sdk.service import ServiceAuth, ServiceTokenProvider
 from leo_sdk.settings import LeoSettings
 from leo_sdk.tags import InvalidTagError, validate_tag
@@ -44,6 +51,7 @@ __all__ = [
     "LeoSettings",
     "LeoUnavailableError",
     "LeoUser",
+    "PasswordPolicy",
     "ReplayStore",
     "ServiceAccessDenied",
     "ServiceAuth",

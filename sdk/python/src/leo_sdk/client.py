@@ -4,14 +4,23 @@ Leo no ve la prueba DPoP del navegador: el BFF la verifica (`leo_sdk.dpop`) y
 pasa el `jkt` en estas llamadas.
 """
 
+import time
 from typing import Any
 from uuid import UUID
 
 import httpx
 
 from leo_sdk.errors import InvalidTokenError, LeoUnavailableError, error_from_response
-from leo_sdk.models import Introspection, ServiceToken, TokenSet, UserProfile
+from leo_sdk.models import (
+    Introspection,
+    PasswordPolicy,
+    ServiceToken,
+    TokenSet,
+    UserProfile,
+)
 from leo_sdk.settings import LeoSettings
+
+POLICY_CACHE_SECONDS = 30.0
 
 
 class LeoClient:
@@ -28,6 +37,7 @@ class LeoClient:
             settings.app_client_id, settings.app_client_secret.get_secret_value()
         )
         self._service_tokens: Any = None  # ServiceTokenProvider, perezoso
+        self._policy: tuple[float, PasswordPolicy] | None = None
 
     async def aclose(self) -> None:
         if self._owns_http:
@@ -40,15 +50,16 @@ class LeoClient:
         *,
         json: Any = None,
         bearer: str | None = None,
+        public: bool = False,
     ) -> httpx.Response:
         """Con `bearer` la llamada va con `Authorization: Bearer` (token de
-        servicio) en vez de HTTP Basic."""
+        servicio) en vez de HTTP Basic; `public` = endpoint sin credenciales."""
         try:
             response = await self._http.request(
                 method,
                 f"{self._base}{path}",
                 json=json,
-                auth=self._auth if bearer is None else None,
+                auth=self._auth if bearer is None and not public else None,
                 headers={"Authorization": f"Bearer {bearer}"} if bearer else None,
             )
         except httpx.HTTPError as exc:  # red, timeout, DNS...
@@ -65,6 +76,17 @@ class LeoClient:
             payload,
             retry_after=int(retry_after) if retry_after.isdigit() else None,
         )
+
+    async def password_policy(self) -> PasswordPolicy:
+        """Politica de contrasenas vigente (endpoint publico, sin credenciales).
+        Se guarda 30 s en memoria para no consultar a Leo en cada validacion."""
+        now = time.monotonic()
+        if self._policy and now - self._policy[0] < POLICY_CACHE_SECONDS:
+            return self._policy[1]
+        response = await self._request("GET", "/auth/password-policy", public=True)
+        policy = PasswordPolicy.model_validate(response.json())
+        self._policy = (now, policy)
+        return policy
 
     async def exchange_code(
         self, code: str, code_verifier: str, redirect_uri: str, jkt: str

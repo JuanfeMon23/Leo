@@ -55,6 +55,7 @@ from app.core.pagination import Pagination, paginate
 from app.core.rate_limit import SlidingWindowLimiter, make_limiter
 from app.core.request_meta import RequestMeta
 from app.core.schemas import Page
+from app.core.security.passwords import PasswordPolicy
 from app.core.service_authz import ServicePrincipal
 from app.modules import applications, audit, roles, users
 from app.modules.auth import repository
@@ -124,6 +125,8 @@ class LoginLimiters:
     # por minuto por app llamadora y por usuario.
     delegated_by_app: SlidingWindowLimiter
     delegated_by_user: SlidingWindowLimiter
+    # Politica de contrasenas publica (sin sesion): consultas por IP.
+    public_policy: SlidingWindowLimiter
 
     async def reset(self) -> None:
         for limiter in (
@@ -135,6 +138,7 @@ class LoginLimiters:
             self.password_failures,
             self.delegated_by_app,
             self.delegated_by_user,
+            self.public_policy,
         ):
             await limiter.reset()
 
@@ -156,6 +160,7 @@ def login_limiters() -> LoginLimiters:
             password_failures=make_limiter("password.failures"),
             delegated_by_app=make_limiter("delegated.app"),
             delegated_by_user=make_limiter("delegated.user"),
+            public_policy=make_limiter("public.policy"),
         )
     return _limiters
 
@@ -189,6 +194,21 @@ async def failure_rule() -> dict[str, int]:
         "limit": values["auth.login_max_failed_attempts"],
         "window_seconds": values["auth.login_lock_minutes"] * 60,
     }
+
+
+# --- politica de contrasenas publica ---
+
+
+async def public_password_policy(meta: RequestMeta) -> PasswordPolicy:
+    """Politica vigente para quien no tiene sesion (la pantalla de activacion
+    de Acuarius). Limitada por IP; solo lee ajustes (con cache)."""
+    wait = await login_limiters().public_policy.check_and_hit(
+        meta.ip or "desconocida",
+        **await rate_rule("rate_limit.public_policy_per_window"),
+    )
+    if wait:
+        raise TooManyRequestsError(TOO_MANY_ATTEMPTS, wait)
+    return await runtime_settings.password_policy()
 
 
 # --- resultados ---
