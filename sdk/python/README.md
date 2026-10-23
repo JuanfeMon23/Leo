@@ -90,6 +90,8 @@ async def things(p: Annotated[LeoUser, auth.require_action("miapp.things.view")]
 1. Declarar las claves: `registry = SettingsRegistry([SettingDef("auth.max_x", "int", 5, "Descripción", min=1, max=20, unit="count", group="auth"), ...])`.
 2. Modelos sobre su `Base`: `models = make_settings_models(Base, user_pk="users.id")` (importarlos en el registro de modelos de Alembic).
 3. En una migración Alembic propia: `from leo_sdk.settings_store import migration` y `migration.upgrade(op)` / `migration.downgrade(op)` (crea las dos tablas y el trigger append-only).
+   Apps sin tabla de usuarios: `make_settings_models(Base, user_pk=None)` y `migration.upgrade(op, users_table=None)` / `downgrade(op, users_table=None)`
+   dejan `updated_by`/`changed_by` como UUID sin FK (mismo esquema, constraints, índice y triggers).
 4. `store = SettingsStore(registry, session_factory, models)`; al arrancar `await store.sync_registry(initial_values)`; leer con `await store.get("auth.max_x")`.
 5. Montar `build_settings_router(store, SettingsRouterDeps(view_dep=..., edit_dep=..., edit_security_dep=..., audit=...))` bajo el prefijo que quiera la app.
 

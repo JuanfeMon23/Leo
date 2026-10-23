@@ -104,14 +104,20 @@ def _ck(sql: str, name: str) -> CheckConstraint:
 
 
 def make_settings_models(
-    base: type[DeclarativeBase], *, user_pk: str = "users.id"
+    base: type[DeclarativeBase], *, user_pk: str | None = "users.id"
 ) -> SettingsModels:
     """Declara `Setting` y `SettingHistory` sobre `base`.
 
     `user_pk`: columna `tabla.columna` (UUID) de los usuarios de la app, a la
-    que apuntan `updated_by` y `changed_by`.
+    que apuntan `updated_by` y `changed_by`. Con `user_pk=None` (apps sin tabla
+    de usuarios) ambas son UUID simples, sin llave foranea.
     """
-    user_table = user_pk.split(".", 1)[0]
+    user_table = user_pk.split(".", 1)[0] if user_pk else None
+
+    def actor_fk(table: str, column: str) -> tuple[ForeignKey, ...]:
+        if user_pk is None:
+            return ()
+        return (ForeignKey(user_pk, name=conv(f"fk_{table}_{column}_{user_table}")),)
 
     class Setting(base):  # type: ignore[valid-type, misc]
         __tablename__ = SETTINGS_TABLE
@@ -142,10 +148,7 @@ def make_settings_models(
             Integer, server_default=text("1"), nullable=False
         )
         updated_by: Mapped[uuid.UUID | None] = mapped_column(
-            UUID(as_uuid=True),
-            ForeignKey(
-                user_pk, name=conv(f"fk_{SETTINGS_TABLE}_updated_by_{user_table}")
-            ),
+            UUID(as_uuid=True), *actor_fk(SETTINGS_TABLE, "updated_by")
         )
         updated_by_username: Mapped[str | None] = mapped_column(String(100))
         created_at: Mapped[datetime] = mapped_column(
@@ -186,10 +189,7 @@ def make_settings_models(
         new_value: Mapped[Any] = mapped_column(JSONB, nullable=False)
         version_after: Mapped[int] = mapped_column(Integer, nullable=False)
         changed_by: Mapped[uuid.UUID | None] = mapped_column(
-            UUID(as_uuid=True),
-            ForeignKey(
-                user_pk, name=conv(f"fk_{HISTORY_TABLE}_changed_by_{user_table}")
-            ),
+            UUID(as_uuid=True), *actor_fk(HISTORY_TABLE, "changed_by")
         )
         changed_by_username: Mapped[str | None] = mapped_column(String(100))
         changed_at: Mapped[datetime] = mapped_column(
