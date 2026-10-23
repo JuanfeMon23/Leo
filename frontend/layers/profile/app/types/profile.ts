@@ -6,6 +6,8 @@ export interface ProfileUpdatePayload {
   first_name?: string
   last_name?: string
   email?: string
+  /** Obligatoria solo si cambia el correo. Solo viaja en la petición. */
+  current_password?: string
 }
 
 /** Cuerpo de `POST /auth/me/password`. Solo viaja en la petición; no se guarda. */

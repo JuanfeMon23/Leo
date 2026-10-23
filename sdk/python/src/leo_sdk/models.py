@@ -129,3 +129,12 @@ class LeoUser:
             },
             "applications": [a.model_dump() for a in self.applications],
         }
+
+
+class UserProfile(BaseModel):
+    """Perfil minimo devuelto al editar en nombre del usuario."""
+
+    first_name: str
+    last_name: str
+    email: str
+    username: str

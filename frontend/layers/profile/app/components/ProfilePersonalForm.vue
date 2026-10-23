@@ -2,7 +2,8 @@
 import { useZodForm } from '#andromeda/composables/useZodForm'
 import type { LeoUser } from '#leo-client/lib/types'
 import type { ProfileUpdatePayload } from '../types/profile'
-import { profileSchema } from '../utils/profileSchemas'
+import { profileUpdateFieldError } from '../utils/profileErrors'
+import { profileFormSchema } from '../utils/profileSchemas'
 
 /**
  * Datos personales de la persona con sesión: usuario (solo lectura) y
@@ -23,8 +24,10 @@ const toValues = (u: LeoUser | null) => ({
   email: u?.email ?? ''
 })
 
-const form = useZodForm(profileSchema, { initialValues: () => toValues(user.value) })
-const values = form.values as { first_name?: string, last_name?: string, email?: string }
+const form = useZodForm(profileFormSchema(() => user.value?.email ?? ''), {
+  initialValues: () => ({ ...toValues(user.value), current_password: '' })
+})
+const values = form.values as { first_name?: string, last_name?: string, email?: string, current_password?: string }
 
 /** Solo los campos que cambiaron (comparados ya recortados). */
 const changes = computed<ProfileUpdatePayload>(() => {
@@ -37,13 +40,27 @@ const changes = computed<ProfileUpdatePayload>(() => {
   return out
 })
 const dirty = computed(() => Object.keys(changes.value).length > 0)
+// «Contraseña actual» solo se pide (y se envía) si el correo cambió.
+const emailChanged = computed(() => changes.value.email !== undefined)
 
 const onSubmit = form.submit(async () => {
-  const me = await api.update(changes.value)
-  session.setMe(me)
-  form.reset(toValues(me.user))
-  toast.success('Datos actualizados')
+  const body: ProfileUpdatePayload = { ...changes.value }
+  if (emailChanged.value) body.current_password = values.current_password ?? ''
+  try {
+    const me = await api.update(body)
+    session.setMe(me)
+    form.reset({ ...toValues(me.user), current_password: '' })
+    toast.success('Datos actualizados')
+  } catch (err) {
+    const message = profileUpdateFieldError(err)
+    if (!message) throw err
+    form.setFieldError('current_password', message)
+    // La contraseña rechazada no queda en el campo.
+    form.setFieldValue('current_password', '', false)
+  }
 })
+
+onBeforeUnmount(() => form.reset())
 </script>
 
 <template>
@@ -66,6 +83,9 @@ const onSubmit = form.submit(async () => {
       </div>
       <UiFormField name="email" label="Correo electrónico" required>
         <UiTextInput type="email" autocomplete="email" />
+      </UiFormField>
+      <UiFormField v-if="emailChanged" name="current_password" label="Contraseña actual" hint="Necesaria para confirmar el cambio de correo." required>
+        <UiPasswordInput autocomplete="current-password" />
       </UiFormField>
 
       <div>

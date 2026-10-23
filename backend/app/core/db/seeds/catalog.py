@@ -16,13 +16,20 @@ LEO_APP_DESCRIPTION = "SSO, control de acceso y auditoria central del ecosistema
 LEO_ADMIN_ROLE_SLUG = "leo-admin"
 LEO_ADMIN_ROLE_NAME = "Administrador de Leo"
 
-# Unico rol de la app `leo` que se puede conceder a una app llamadora (acceso
-# de servicio): solo da `leo.users.provision-patient`. Los demas roles de Leo
-# siguen siendo solo para personas con sesion (ver `grant_service_access`).
+# Roles de la app `leo` que se pueden conceder a una app llamadora (acceso de
+# servicio): `leo-patient-provisioner` solo da `leo.users.provision-patient` y
+# `leo-self-service-delegate` solo da `leo.users.delegated-self-manage`. Los
+# demas roles de Leo (p. ej. `leo-admin`) siguen siendo solo para personas con
+# sesion (ver `grant_service_access`).
 LEO_PROVISIONER_ROLE_SLUG = "leo-patient-provisioner"
 LEO_PROVISIONER_ROLE_NAME = "Aprovisionador de pacientes"
 LEO_PROVISION_PATIENT_TAG = "leo.users.provision-patient"
-LEO_SERVICE_GRANTABLE_ROLE_SLUGS = frozenset({LEO_PROVISIONER_ROLE_SLUG})
+LEO_DELEGATE_ROLE_SLUG = "leo-self-service-delegate"
+LEO_DELEGATE_ROLE_NAME = "Delegado de autogestión de usuarios"
+LEO_DELEGATED_SELF_MANAGE_TAG = "leo.users.delegated-self-manage"
+LEO_SERVICE_GRANTABLE_ROLE_SLUGS = frozenset(
+    {LEO_PROVISIONER_ROLE_SLUG, LEO_DELEGATE_ROLE_SLUG}
+)
 
 # slug del modulo -> (nombre, {verbo: descripcion})
 LEO_MODULES: dict[str, tuple[str, dict[str, str]]] = {
@@ -52,6 +59,9 @@ LEO_MODULES: dict[str, tuple[str, dict[str, str]]] = {
             "assign-roles": "Asignar o quitar roles a un usuario",
             "provision-patient": "Crear usuarios con el rol paciente desde una "
             "aplicacion con credencial de servicio",
+            "delegated-self-manage": "Editar el perfil y cambiar la contrasena de "
+            "un usuario sin permisos de Leo en nombre suyo, desde una aplicacion "
+            "con credencial de servicio y el token de acceso del usuario",
         },
     ),
     "roles": (
@@ -108,6 +118,7 @@ LEO_ACTION_NAMES: dict[str, str] = {
     "leo.users.reset-password": "Restablecer contraseñas",
     "leo.users.assign-roles": "Asignar roles a usuarios",
     "leo.users.provision-patient": "Aprovisionar pacientes",
+    "leo.users.delegated-self-manage": "Delegar la autogestión de usuarios",
     "leo.roles.view": "Consultar roles",
     "leo.roles.create": "Crear roles",
     "leo.roles.edit": "Editar roles",

@@ -152,6 +152,14 @@ async def test_revocar_sesion_admite_password_change(
     assert error == CHECK_VIOLATION
 
 
+async def test_revocar_sesion_admite_email_change(
+    conn: AsyncConnection, expect_error: ExpectError
+) -> None:
+    session_id = await make_session(conn, await make_user(conn))
+    sql = "UPDATE sessions SET revoked_at = now(), revoked_reason = :r WHERE id = :id"
+    assert await expect_error(sql, {"id": session_id, "r": "email-change"}) is None
+
+
 # --- tokens ---
 
 

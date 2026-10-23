@@ -113,15 +113,15 @@ def test_campos_sensibles(name: str) -> None:
 # --- limitador ---
 
 
-def test_limitador_ventana_deslizante() -> None:
+async def test_limitador_ventana_deslizante() -> None:
     limiter = SlidingWindowLimiter(limit=2, window_seconds=60)
     now = clock.now()
-    limiter.hit("k", now)
-    assert limiter.retry_after("k", now) == 0
-    limiter.hit("k", now)
-    assert 0 < limiter.retry_after("k", now) <= 61
-    assert limiter.retry_after("k", now + timedelta(seconds=61)) == 0
-    assert limiter.retry_after("otra", now) == 0
+    await limiter.hit("k", now)
+    assert await limiter.retry_after("k", now) == 0
+    await limiter.hit("k", now)
+    assert 0 < await limiter.retry_after("k", now) <= 61
+    assert await limiter.retry_after("k", now + timedelta(seconds=61)) == 0
+    assert await limiter.retry_after("otra", now) == 0
 
 
 # --- errores uniformes ---

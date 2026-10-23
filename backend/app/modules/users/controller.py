@@ -31,7 +31,8 @@ from app.core.exceptions import (
     not_found,
 )
 from app.core.pagination import Pagination, get_or_404, paginate
-from app.core.rate_limit import SlidingWindowLimiter
+from app.core.request_meta import RequestMeta
+from app.core.rate_limit import SlidingWindowLimiter, make_limiter
 from app.core.schemas import Page
 from app.core.security.passwords import (
     burn_verification_time,
@@ -45,6 +46,9 @@ from app.modules import audit, auth, roles
 from app.modules.users import repository
 from app.modules.users.models import User, UserRole
 from app.modules.users.schemas import (
+    DelegatedPasswordChange,
+    DelegatedProfileRead,
+    DelegatedProfileUpdate,
     PasswordReset,
     PatientProvision,
     PatientRead,
@@ -70,6 +74,15 @@ USER_FIELDS = (
 )
 PROFILE_FIELDS = ("first_name", "last_name", "email")
 SELF_SERVICE_REASON = "autogestión"
+
+
+def self_service_reason(via: str | None = None, detail: str | None = None) -> str:
+    """Motivo de auditoria de la autogestion: `autogestión[: detalle]` y, si
+    la hace una app en nombre del usuario, `; via=servicio:<client_id>`."""
+    reason = f"{SELF_SERVICE_REASON}: {detail}" if detail else SELF_SERVICE_REASON
+    return f"{reason}; via={via}" if via else reason
+
+
 _USER = "un usuario"
 
 
@@ -348,14 +361,20 @@ async def reset_password(
 
 
 async def update_own_profile(
-    session: AsyncSession, user_id: UUID, data: ProfileUpdate, actor: Actor
+    session: AsyncSession,
+    user_id: UUID,
+    data: ProfileUpdate,
+    actor: Actor,
+    via: str | None = None,
 ) -> bool:
     """Cambia nombres/correo del propio usuario. True si hubo cambios reales;
     si no, no escribe ni audita. Sin commit."""
     user = await get_or_404(session, User, user_id, _USER)
     changes = {
         name: value
-        for name, value in data.model_dump(exclude_unset=True).items()
+        for name, value in data.model_dump(
+            exclude_unset=True, exclude={"current_password"}
+        ).items()
         if getattr(user, name) != value
     }
     if not changes:
@@ -375,10 +394,27 @@ async def update_own_profile(
             entity_type="user",
             entity_id=str(user.id),
             changes=diff(before, snapshot(user, PROFILE_FIELDS)),
-            reason=SELF_SERVICE_REASON,
+            reason=self_service_reason(via),
         ),
     )
     return True
+
+
+async def is_email_change(session: AsyncSession, user_id: UUID, data: ProfileUpdate) -> bool:
+    """True si `data` pide otro correo (sin distinguir mayusculas: cambiar solo
+    la capitalizacion no cede la cuenta a nadie)."""
+    if data.email is None:
+        return False
+    user = await get_or_404(session, User, user_id, _USER)
+    return data.email.casefold() != user.email.casefold()
+
+
+async def verify_own_password(
+    session: AsyncSession, user_id: UUID, password: str
+) -> bool:
+    """True si `password` es la contrasena actual del usuario (sin efectos)."""
+    user = await get_or_404(session, User, user_id, _USER)
+    return verify_password(user.password_hash, password)
 
 
 async def change_own_password(
@@ -387,6 +423,7 @@ async def change_own_password(
     current_password: str,
     new_password: str,
     actor: Actor,
+    via: str | None = None,
 ) -> None:
     """Cambia la contrasena del propio usuario: exige la actual, aplica la
     politica compartida, rechaza reusar la actual y reinicia intentos y
@@ -416,7 +453,7 @@ async def change_own_password(
             entity_type="user",
             entity_id=str(user.id),
             changes=diff(before, snapshot(user, USER_FIELDS)),
-            reason=SELF_SERVICE_REASON,
+            reason=self_service_reason(via),
         ),
     )
 
@@ -491,8 +528,8 @@ def provision_limiter() -> SlidingWindowLimiter:
     """Altas de pacientes por minuto y por app llamadora (en memoria)."""
     global _provision_limiter
     if _provision_limiter is None:
-        _provision_limiter = SlidingWindowLimiter(
-            get_settings().leo_provision_rate_limit_per_minute, 60
+        _provision_limiter = make_limiter(
+            "provision", get_settings().leo_provision_rate_limit_per_minute, 60
         )
     return _provision_limiter
 
@@ -529,12 +566,11 @@ async def provision_patient(
     no delate si choco. Audita con actor = servicio."""
     limiter = provision_limiter()
     key = str(principal.application_id)
-    wait = limiter.retry_after(key)
+    wait = await limiter.check_and_hit(key)
     if wait:
         raise TooManyRequestsError(
             "Demasiadas solicitudes de alta. Intenta de nuevo más tarde.", wait
         )
-    limiter.hit(key)
 
     _check_password(data.password, data.username, data.email)
     password_hash = hash_password(data.password)
@@ -593,3 +629,42 @@ async def provision_patient(
     )
     await session.commit()
     return PatientRead.model_validate(user)
+
+
+# --- autogestion delegada (la reglas viven en `auth`, compartidas con la cookie) ---
+
+DELEGATED_TAG = "leo.users.delegated-self-manage"
+
+
+async def delegated_update_profile(
+    session: AsyncSession,
+    principal: ServicePrincipal,
+    data: DelegatedProfileUpdate,
+    meta: RequestMeta,
+) -> DelegatedProfileRead:
+    identity = await auth.delegated_update_profile(
+        session, principal, data.user_access_token, data.profile(), meta, DELEGATED_TAG
+    )
+    return DelegatedProfileRead(
+        first_name=identity.first_name,
+        last_name=identity.last_name,
+        email=identity.email,
+        username=identity.username,
+    )
+
+
+async def delegated_change_password(
+    session: AsyncSession,
+    principal: ServicePrincipal,
+    data: DelegatedPasswordChange,
+    meta: RequestMeta,
+) -> None:
+    await auth.delegated_change_password(
+        session,
+        principal,
+        data.user_access_token,
+        data.current_password,
+        data.new_password,
+        meta,
+        DELEGATED_TAG,
+    )

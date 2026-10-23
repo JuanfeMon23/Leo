@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { LeoApiError } from '#leo-client/lib/errors'
 import { mapApiErrorToForm } from '#andromeda/utils/mapApiErrorToForm'
-import { profilePasswordErrors } from './profileErrors'
+import { profilePasswordErrors, profileUpdateFieldError } from './profileErrors'
 
 describe('profilePasswordErrors', () => {
   it('invalid_credentials: error del campo «contraseña actual», sin error general', () => {
@@ -61,5 +61,17 @@ describe('errores del perfil con mapApiErrorToForm', () => {
     const r = mapApiErrorToForm(err, { fields })
     expect(r.formError).toBeNull()
     expect(r.fieldErrors).toEqual({ first_name: 'Demasiado largo.', email: 'Correo inválido.' })
+  })
+})
+
+describe('profileUpdateFieldError', () => {
+  it('current_password_required (422) e invalid_current_password (403): mensaje del campo', () => {
+    expect(profileUpdateFieldError(new LeoApiError(422, 'current_password_required', 'raw'))).toMatch(/contraseña actual/i)
+    expect(profileUpdateFieldError(new LeoApiError(403, 'invalid_current_password', 'raw'))).toBe('La contraseña actual no es correcta.')
+  })
+
+  it('otros errores: null (los resuelve el mapeo general)', () => {
+    expect(profileUpdateFieldError(new LeoApiError(409, 'duplicate', 'x'))).toBeNull()
+    expect(profileUpdateFieldError(new TypeError('Failed to fetch'))).toBeNull()
   })
 })

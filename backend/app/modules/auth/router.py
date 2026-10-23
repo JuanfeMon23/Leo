@@ -115,12 +115,20 @@ async def me(session: SessionDep, principal: CurrentPrincipal) -> MeResponse:
 @router.patch(
     "/me/profile",
     response_model=MeResponse,
-    responses=error_responses(401, 409, 422),
+    responses=error_responses(401, 403, 409, 422, 429),
     summary="Editar mis nombres y correo (autogestión; sin permisos `leo.*`)",
     description="Solo `first_name`, `last_name` y `email` del usuario de la "
     "sesión. Usuario, documento, estado y roles no se editan aquí (422). Sin "
     "cambios reales no escribe. Correo único sin distinguir mayúsculas (409 "
-    "`duplicate`, `details.email`).",
+    "`duplicate`, `details.email`).\n\n"
+    "**Cambiar a OTRO correo exige `current_password`** (una sesión robada no "
+    "debe poder tomar la cuenta): falta -> 422 `current_password_required`; "
+    "incorrecta -> 403 `invalid_current_password` (mensaje genérico, cuenta "
+    "como intento fallido con el mismo bloqueo que `/me/password`, 429 "
+    "`too_many_attempts`); correcta -> cambia y cierra las demás sesiones "
+    "(la actual se mantiene). Solo nombres, o solo cambiar mayúsculas del "
+    "mismo correo, no la piden; sin cambio de correo `current_password` se "
+    "ignora.",
 )
 async def update_profile(
     session: SessionDep,

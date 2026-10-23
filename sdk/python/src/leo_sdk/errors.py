@@ -48,6 +48,17 @@ class InvalidTargetError(LeoError):
     """400 `invalid_target`: la audiencia no existe o no esta activa."""
 
 
+class InvalidTokenError(LeoError):
+    """401 `invalid_token`. Con `details == {"field": "user_access_token"}` es el
+    token del USUARIO (vencido, revocado o de otra app); si no, el de servicio."""
+
+    @property
+    def is_user_token(self) -> bool:
+        return isinstance(self.details, dict) and (
+            self.details.get("field") == "user_access_token"
+        )
+
+
 class ServiceAccessDenied(LeoError):
     """403 `access_denied`: la app no tiene concesion hacia esa audiencia."""
 
@@ -93,6 +104,8 @@ def error_from_response(
         return LeoUnavailableError(message, details)
     if code == "invalid_client" and status_code == 401:
         return InvalidClientError(code, message, status_code, details)
+    if code == "invalid_token" and status_code == 401:
+        return InvalidTokenError(code, message, status_code, details)
     if code == "invalid_target":
         return InvalidTargetError(code, message, status_code, details)
     if code == "access_denied" and status_code == 403:

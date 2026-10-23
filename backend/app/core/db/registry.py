@@ -3,6 +3,7 @@
 Registrar un modulo nuevo = importar su `models.py` aqui.
 """
 
+from app.core.db import rate_limit_model  # noqa: F401
 from app.core.db.base import Base
 from app.modules.applications import models as applications_models  # noqa: F401
 from app.modules.audit import models as audit_models  # noqa: F401
