@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LeoApiError, isSessionError, leoErrorMessage } from './errors'
+import { LeoApiError, isForbiddenError, isSessionError, leoErrorMessage } from './errors'
 
 function jsonResponse(status: number, body: unknown, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } })
@@ -111,5 +111,13 @@ describe('leoErrorMessage: 422 de page_size', () => {
   it('otros 422 siguen mostrando el message del backend', () => {
     expect(leoErrorMessage(err([{ field: 'name', message: 'x' }], 'Algunos datos no son válidos.')))
       .toBe('Algunos datos no son válidos.')
+  })
+})
+
+describe('401 de sesión sin ruido', () => {
+  it('leoErrorMessage da un mensaje neutro (ya se redirige) y isForbiddenError distingue forbidden', () => {
+    expect(leoErrorMessage(new LeoApiError(401, 'session_expired', 'Tu sesión expiró.'))).toBe('Redirigiendo al inicio de sesión…')
+    expect(isForbiddenError(new LeoApiError(403, 'forbidden', 'x'))).toBe(true)
+    expect(isForbiddenError(new LeoApiError(403, 'account_locked', 'x'))).toBe(false)
   })
 })

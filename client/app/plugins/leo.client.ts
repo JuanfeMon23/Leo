@@ -2,6 +2,9 @@ import { createDpopSigner, indexedDbDpopKeyStore, memoryDpopKeyStore } from '../
 import { broadcastIdleChannel, createIdleTracker } from '../lib/idleTracker'
 import type { IdleLogoutReason, IdleTracker } from '../lib/idleTracker'
 import { leoErrorMessage } from '../lib/errors'
+import { LOGIN_LOOP_MESSAGE, loginLoopGuard } from '../lib/loginGuard'
+import { createForbiddenHandler } from '../lib/forbiddenRefresh'
+import { createLoginRedirector } from '../lib/loginRedirect'
 import { createLeoBffTransport, createLeoDirectTransport } from '../lib/transport'
 import type { LeoTransport } from '../lib/transport'
 
@@ -23,25 +26,38 @@ export default defineNuxtPlugin(async (nuxtApp) => {
   const store = typeof indexedDB === 'undefined' ? memoryDpopKeyStore() : indexedDbDpopKeyStore()
   const signer = await createDpopSigner(store)
 
-  const goToLogin = (reason?: string) =>
-    nuxtApp.runWithContext(async () => {
-      sessionState.value = { status: 'anonymous', me: null }
-      const route = useRouter().currentRoute.value
-      // Ya en login (direct) o cerrando el login (bff): no pedir otro.
-      if (route.path === config.loginPath || (transport.kind === 'bff' && route.path === config.callbackPath)) return
-      try {
-        const location = await transport.login(route.fullPath, reason)
-        return await navigateTo(location.url, { external: location.external, replace: true })
-      } catch (err) {
-        showError(createError({ statusCode: 503, statusMessage: leoErrorMessage(err), fatal: true }))
-      }
-    })
+  // Una sola redirección aunque lleguen varios 401; con tope contra bucles de login.
+  const goToLogin = createLoginRedirector({
+    skip: () => {
+      const path = useRouter().currentRoute.value.path
+      return path === config.loginPath || (transport.kind === 'bff' && path === config.callbackPath)
+    },
+    currentPath: () => useRouter().currentRoute.value.fullPath,
+    login: (returnTo, reason) => transport.login(returnTo, reason),
+    navigate: location => nuxtApp.runWithContext(() => navigateTo(location.url, { external: location.external, replace: true })),
+    guard: loginLoopGuard,
+    onBlocked: () => showError(createError({ statusCode: 401, statusMessage: LOGIN_LOOP_MESSAGE, fatal: true })),
+    onError: err => showError(createError({ statusCode: 503, statusMessage: leoErrorMessage(err), fatal: true }))
+  })
+
+  const redirectToLogin = (reason?: string) => {
+    sessionState.value = { status: 'anonymous', me: null }
+    return nuxtApp.runWithContext(() => goToLogin(reason))
+  }
 
   if (!config.apiBase) throw new Error('Falta NUXT_PUBLIC_LEO_API_BASE (configuración de leo-client).')
   const onUnauthorized = () => {
     stopTracker()
-    void goToLogin('expired')
+    void redirectToLogin('expired')
   }
+
+  // 403 `forbidden`: refresca permisos; solo navega si la llamada lo pidió.
+  const onForbidden = createForbiddenHandler({
+    refresh: () => nuxtApp.runWithContext(() => useLeoSession().ensure(true)),
+    goToForbiddenPage: () => void nuxtApp.runWithContext(() =>
+      navigateTo({ path: '/leo/forbidden', query: { from: useRouter().currentRoute.value.fullPath } }, { replace: true }))
+  })
+
   const transport: LeoTransport = config.transport === 'bff'
     ? createLeoBffTransport({
         apiBase: config.apiBase,
@@ -49,14 +65,16 @@ export default defineNuxtPlugin(async (nuxtApp) => {
         authPath: config.authPath,
         idleTimeoutSeconds: config.idleTimeoutSeconds,
         signer,
-        onUnauthorized
+        onUnauthorized,
+        onForbidden: (_err, mode) => onForbidden(mode)
       })
     : createLeoDirectTransport({
         apiBase: config.apiBase,
         publicUrl: config.publicUrl,
         loginPath: config.loginPath,
         signer,
-        onUnauthorized
+        onUnauthorized,
+        onForbidden: (_err, mode) => onForbidden(mode)
       })
 
   // ── inactividad ───────────────────────────────────────────────────────
@@ -91,11 +109,11 @@ export default defineNuxtPlugin(async (nuxtApp) => {
       onExpire: async () => {
         stopTracker()
         await transport.logout().catch(() => {})
-        await goToLogin('idle')
+        await redirectToLogin('idle')
       },
       onRemoteLogout: (reason: IdleLogoutReason) => {
         stopTracker()
-        void goToLogin(reason === 'idle' ? 'idle' : undefined)
+        void redirectToLogin(reason === 'idle' ? 'idle' : undefined)
       }
     })
     for (const event of ACTIVITY_EVENTS) window.addEventListener(event, onActivity, { capture: true, passive: true })

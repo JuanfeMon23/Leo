@@ -1,6 +1,6 @@
 import { dpopHtu } from './dpop'
 import type { DpopSigner } from './dpop'
-import { LeoApiError, isSessionError } from './errors'
+import { LeoApiError, isForbiddenError, isSessionError } from './errors'
 import { safeReturnTo } from './returnTo'
 import type { LeoMe } from './types'
 
@@ -17,6 +17,8 @@ export type LeoTransportKind = 'leo-direct' | 'bff'
 
 export type LeoQueryValue = string | number | boolean | null | undefined
 
+export type LeoForbiddenMode = 'refresh' | 'forbidden-page'
+
 export interface LeoRequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
   query?: Record<string, LeoQueryValue | readonly LeoQueryValue[]>
@@ -24,6 +26,12 @@ export interface LeoRequestOptions {
   responseType?: 'json' | 'blob'
   /** No dispara `onUnauthorized` ante un 401 (login, carga inicial de sesión). */
   skipSessionHandling?: boolean
+  /**
+   * Qué hacer ante un 403 `forbidden` (además de refrescar la sesión, que es
+   * siempre): `'forbidden-page'` navega a `/leo/forbidden`; por defecto no se
+   * navega (el llamador muestra el error legible).
+   */
+  onForbidden?: LeoForbiddenMode
   signal?: AbortSignal
 }
 
@@ -71,6 +79,12 @@ export interface LeoSignedRequesterOptions {
   fetch?: typeof fetch
   /** 401 de sesión en cualquier petición (salvo `skipSessionHandling`). */
   onUnauthorized?: (err: LeoApiError) => void
+  /**
+   * 403 con code `forbidden` (no reglas de negocio con otro code) en cualquier
+   * petición (salvo `skipSessionHandling`): refrescar permisos; `mode` según
+   * la opción `onForbidden` de la llamada.
+   */
+  onForbidden?: (err: LeoApiError, mode: LeoForbiddenMode) => void
 }
 
 export interface LeoDirectTransportOptions extends LeoSignedRequesterOptions {
@@ -109,7 +123,10 @@ function createSignedRequester(options: LeoSignedRequesterOptions) {
     const response = await doFetch(url, { method, headers, body, credentials: 'include', signal: opts.signal })
     if (!response.ok) {
       const err = await LeoApiError.fromResponse(response)
-      if (!opts.skipSessionHandling && isSessionError(err)) options.onUnauthorized?.(err)
+      if (!opts.skipSessionHandling) {
+        if (isSessionError(err)) options.onUnauthorized?.(err)
+        else if (isForbiddenError(err)) options.onForbidden?.(err, opts.onForbidden ?? 'refresh')
+      }
       throw err
     }
     if (response.status === 204) return undefined as T
@@ -289,10 +306,14 @@ export function createLeoBffTransport(options: LeoBffTransportOptions): LeoTrans
       }
     },
     jkt: () => options.signer.jkt(),
-    async login(returnTo) {
+    async login(returnTo, reason) {
       // Antes de salir de la SPA: la navegación a Leo no lleva estado.
       returnStore.set(safeReturnTo(returnTo))
-      const body = await request<{ authorize_url?: unknown }>(`${authPath}/login`, { skipSessionHandling: true })
+      const body = await request<{ authorize_url?: unknown }>(`${authPath}/login`, {
+        // `reason` (expired/idle…) viaja como query; el backend puede ignorarlo.
+        query: { reason },
+        skipSessionHandling: true
+      })
       const url = parseAuthorizeUrl(body?.authorize_url)
       // La llave de la app es la que presentará los tokens: el flujo debe ir atado a ella.
       if (!url || url.searchParams.get('dpop_jkt') !== await options.signer.jkt()) {

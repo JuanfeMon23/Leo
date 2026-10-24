@@ -79,6 +79,14 @@ export function isSessionError(err: unknown): err is LeoApiError {
   return err instanceof LeoApiError && err.status === 401 && SESSION_CODES.has(err.code)
 }
 
+/** 403 de permisos (`forbidden`); los 403 de reglas de negocio llevan otro code. */
+export function isForbiddenError(err: unknown): err is LeoApiError {
+  return err instanceof LeoApiError && err.status === 403 && err.code === 'forbidden'
+}
+
+/** Mensaje neutro de un 401 de sesión: ya se está redirigiendo al login (sin "error" ruidoso). */
+export const SESSION_REDIRECT_MESSAGE = 'Redirigiendo al inicio de sesión…'
+
 /**
  * Mensaje legible para el usuario. Los mensajes del backend de Leo ya están
  * en español y pensados para el usuario final (incluidos 401/403: "Usuario o
@@ -87,6 +95,7 @@ export function isSessionError(err: unknown): err is LeoApiError {
  * `toUserMessage` de Andromeda.
  */
 export function leoErrorMessage(err: unknown): string {
+  if (isSessionError(err)) return SESSION_REDIRECT_MESSAGE
   if (err instanceof LeoApiError) {
     const pageSize = pageSizeMessage(err)
     if (pageSize) return pageSize
