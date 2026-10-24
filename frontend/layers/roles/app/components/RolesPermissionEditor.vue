@@ -9,11 +9,15 @@ import { rolesGroupState, rolesSelectableIds, rolesSetGroup } from '../utils/rol
  * referencia. «Seleccionar todo» marca/desmarca los asignables del módulo.
  * Las acciones de evento (auditoría) no se asignan: van aparte, informativas.
  * Es controlado (`selected`); guardar lo hace quien lo usa.
+ * Con `readonly` (sin permiso de edición) no hay controles: solo la lista de
+ * los permisos concedidos, en texto. `disabled` bloquea el editor un momento
+ * (p. ej. mientras se guarda).
  */
 const props = defineProps<{
   model: RolesPermissionModel
   selected: ReadonlySet<string>
   readonly?: boolean
+  disabled?: boolean
 }>()
 const emit = defineEmits<{ 'update:selected': [value: Set<string>] }>()
 
@@ -28,11 +32,41 @@ function toggleGroup(group: RolesPermissionGroup, on: boolean) {
   emit('update:selected', rolesSetGroup(group, props.selected, on))
 }
 
+const grantedIn = (group: RolesPermissionGroup) => group.permissions.filter(p => props.selected.has(p.id))
+const grantedGroups = computed(() => props.model.groups.filter(group => grantedIn(group).length > 0))
 const markedIn = (group: RolesPermissionGroup) => group.permissions.filter(p => props.selected.has(p.id)).length
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div v-if="readonly" class="space-y-4">
+    <UiCard v-if="grantedGroups.length === 0">
+      <p class="text-sm text-text-muted" data-testid="permissions-empty">Este rol no tiene permisos asignados.</p>
+    </UiCard>
+    <UiCard
+      v-for="group in grantedGroups"
+      :key="group.moduleId"
+      :title="group.name"
+      :description="group.description ?? undefined"
+      data-testid="permission-group"
+    >
+      <ul class="divide-y divide-border">
+        <li
+          v-for="permission in grantedIn(group)"
+          :key="permission.id"
+          class="flex items-start justify-between gap-x-4 py-2.5 text-sm"
+          data-testid="permission-granted"
+        >
+          <div class="min-w-0 flex-1">
+            <span class="font-medium text-text">{{ permission.name }}</span>
+            <p v-if="permission.description" class="text-text-muted">{{ permission.description }}</p>
+          </div>
+          <code class="shrink-0 pt-0.5 text-xs text-text-muted" :title="`Tag técnico: ${permission.tag}`" data-testid="permission-tag">{{ permission.tag }}</code>
+        </li>
+      </ul>
+    </UiCard>
+  </div>
+
+  <div v-else class="space-y-4">
     <UiCard v-if="model.groups.length === 0">
       <p class="text-sm text-text-muted" data-testid="permissions-empty">Esta aplicación aún no tiene permisos que asignar.</p>
     </UiCard>
@@ -47,7 +81,8 @@ const markedIn = (group: RolesPermissionGroup) => group.permissions.filter(p => 
       <template #actions>
         <span class="text-xs text-text-muted" data-testid="group-count">{{ markedIn(group) }} de {{ group.permissions.length }}</span>
         <UiCheckbox
-          v-if="!readonly && rolesSelectableIds(group).length"
+          v-if="rolesSelectableIds(group).length"
+          :disabled="disabled"
           :model-value="rolesGroupState(group, selected) === 'all'"
           :aria-label="`Seleccionar todo en ${group.name}`"
           data-testid="group-all"
@@ -68,7 +103,7 @@ const markedIn = (group: RolesPermissionGroup) => group.permissions.filter(p => 
             class="min-w-0 flex-1"
             :model-value="selected.has(permission.id)"
             :description="permission.description ?? undefined"
-            :disabled="readonly || (!permission.selectable && !selected.has(permission.id))"
+            :disabled="disabled || (!permission.selectable && !selected.has(permission.id))"
             data-testid="permission-check"
             @update:model-value="toggle(permission.id, $event)"
           >

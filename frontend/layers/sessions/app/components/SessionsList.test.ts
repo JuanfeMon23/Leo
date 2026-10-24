@@ -95,6 +95,12 @@ describe('SessionsList', () => {
     signInWith(['leo.auth.view'])
     const wrapper = await mountList()
     expect(wrapper.find('[data-testid="session-revoke"]').exists()).toBe(false)
+    expect(wrapper.findAll('th').some(th => th.text() === 'Acciones')).toBe(false)
+  })
+
+  it('con leo.auth.revoke la columna «Acciones» existe', async () => {
+    const wrapper = await mountList()
+    expect(wrapper.findAll('th').some(th => th.text() === 'Acciones')).toBe(true)
   })
 
   it('filtrar por usuario pide sus sesiones; «solo activas» desmarcado envía active_only=false', async () => {

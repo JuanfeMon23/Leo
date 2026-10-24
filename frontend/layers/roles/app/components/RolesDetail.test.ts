@@ -131,10 +131,14 @@ describe('RolesDetail', () => {
     expect(wrapper.get('[data-testid="save-error"]').text()).not.toMatch(/fetch/i)
   })
 
-  it('sin leo.roles.edit: permisos en solo lectura, sin barra de guardado ni Editar', async () => {
+  it('sin leo.roles.edit: permisos concedidos en texto, sin casillas ni barra de guardado ni Editar', async () => {
     signInWith(['leo.roles.view'])
     const wrapper = await mountDetail({})
-    expect(checks(wrapper).every(i => i.attributes('disabled') !== undefined)).toBe(true)
+    expect(wrapper.find('input').exists()).toBe(false)
+    const granted = wrapper.findAll('[data-testid="permission-granted"]')
+    expect(granted).toHaveLength(1)
+    expect(granted[0]!.text()).toContain('Consultar muestras')
+    expect(wrapper.text()).not.toContain('Editar muestras')
     expect(wrapper.find('[data-testid="save-bar"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="role-edit"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="role-toggle"]').exists()).toBe(false)
@@ -143,8 +147,8 @@ describe('RolesDetail', () => {
   it('catálogo no disponible (403): aviso y solo lo asignado, en solo lectura', async () => {
     const wrapper = await mountDetail({ 'GET /applications/app1': new LeoApiError(403, 'forbidden', 'No tienes permiso para esta acción.') })
     expect(wrapper.get('[data-testid="catalog-error"]').text()).toContain('No tienes permiso para esta acción.')
-    expect(checks(wrapper)).toHaveLength(1)
-    expect(checks(wrapper)[0]!.attributes('disabled')).toBeDefined()
+    expect(wrapper.find('input').exists()).toBe(false)
+    expect(wrapper.findAll('[data-testid="permission-granted"]')).toHaveLength(1)
     expect(wrapper.find('[data-testid="save-bar"]').exists()).toBe(false)
   })
 
