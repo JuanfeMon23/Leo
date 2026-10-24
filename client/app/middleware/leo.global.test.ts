@@ -1,6 +1,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RouteLocationNormalized } from 'vue-router'
+import { loginLoopGuard } from '../lib/loginGuard'
 import middleware from './leo.global'
 
 const { navigateToMock } = vi.hoisted(() => ({ navigateToMock: vi.fn((to: unknown) => to) }))
@@ -27,7 +28,26 @@ function session(status: 'authenticated' | 'anonymous', permissions: string[] = 
 
 const run = (to: RouteLocationNormalized) => middleware(to, to)
 
-beforeEach(() => navigateToMock.mockClear())
+beforeEach(() => {
+  navigateToMock.mockClear()
+  loginLoopGuard.reset()
+})
+
+describe('middleware leo.global: tope de bucles de login', () => {
+  it('tras 2 redirecciones en la ventana aborta con 401 y mensaje fijo; me() ok reinicia', async () => {
+    loginLoopGuard.reset()
+    session('anonymous')
+    await run(route('/a', { tag: 'x' }))
+    await run(route('/a', { tag: 'x' }))
+    navigateToMock.mockClear()
+    const blocked = await run(route('/a', { tag: 'x' })).catch((e: unknown) => e)
+    expect(navigateToMock).not.toHaveBeenCalled()
+    expect(blocked).toMatchObject({ statusCode: 401, statusMessage: 'No pudimos iniciar tu sesión. Cierra la pestaña e inténtalo de nuevo.' })
+    loginLoopGuard.reset()
+    await run(route('/a', { tag: 'x' }))
+    expect(navigateToMock).toHaveBeenCalledTimes(1)
+  })
+})
 
 describe('middleware leo.global', () => {
   it('página pública: pasa sin sesión', async () => {

@@ -1,6 +1,6 @@
 {
   "name": "leo-client",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "type": "module",
   "description": "Capa Nuxt de Leo (sesión SSO, DPoP, permisos por tag, inactividad y barra superior) que extienden las apps del ecosistema.",

@@ -1,3 +1,4 @@
+import { loginLoopGuard } from '../lib/loginGuard'
 import { hasPermission } from '../lib/permissions'
 import type { LeoTagMode } from '../lib/permissions'
 import type { LeoMe } from '../lib/types'
@@ -39,7 +40,12 @@ export function useLeoSession() {
   async function ensure(force = false) {
     if (!force && state.value.status !== 'unknown') return
     loading ??= $leo.transport.me()
-      .then(value => (value ? setMe(value) : clear()))
+      .then((value) => {
+        if (value) {
+          setMe(value)
+          loginLoopGuard.reset() // sesión válida: se acaba el conteo de redirecciones
+        } else clear()
+      })
       .finally(() => { loading = null })
     await loading
   }

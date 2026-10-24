@@ -15,6 +15,8 @@ export interface LeoAppRequestOptions {
   responseType?: 'json' | 'blob'
   /** Guarda la respuesta del GET en la caché del navegador por ese tiempo (ms). */
   cacheTtl?: number
+  /** `'forbidden-page'`: un 403 `forbidden` navega a `/leo/forbidden` (carga principal de una pantalla). */
+  onForbidden?: LeoRequestOptions['onForbidden']
 }
 
 export type LeoSend = <T>(path: string, options?: LeoRequestOptions) => Promise<T>
@@ -40,10 +42,10 @@ export function createLeoAppApi(send: LeoSend, toPath: (path: string) => string)
     body: unknown,
     options: LeoAppRequestOptions
   ): Promise<T> {
-    const { cacheTtl, query, params, signal, responseType } = options
+    const { cacheTtl, query, params, signal, responseType, onForbidden } = options
     const run = async () => {
       try {
-        return await send<T>(toPath(path), { method, body, query: query ?? params, signal, responseType })
+        return await send<T>(toPath(path), { method, body, query: query ?? params, signal, responseType, onForbidden })
       } catch (err) {
         throw withPermissionName(err)
       }

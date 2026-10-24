@@ -121,6 +121,14 @@ describe('createLeoBffTransport: login', () => {
     expect(payload).toMatchObject({ htm: 'GET', htu: `${BACKEND}/auth/login` })
   })
 
+  it('reason viaja como query a /auth/login (y no se envía vacío)', async () => {
+    const { transport, backend } = await setup()
+    await transport.login('/x', 'expired')
+    await transport.login('/x')
+    expect(backend.calls[0]!.url).toBe(`${BACKEND}/auth/login?reason=expired`)
+    expect(backend.calls[1]!.url).toBe(`${BACKEND}/auth/login`)
+  })
+
   it('el dpop_jkt de authorize_url es el de la llave de la app', async () => {
     const { transport, signer } = await setup()
     const { url } = await transport.login('/')

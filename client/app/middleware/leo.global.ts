@@ -1,4 +1,5 @@
 import { leoErrorMessage } from '../lib/errors'
+import { LOGIN_LOOP_MESSAGE, loginLoopGuard } from '../lib/loginGuard'
 import { hasPermission } from '../lib/permissions'
 
 /**
@@ -19,6 +20,10 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
 
   if (!session.isAuthenticated.value) {
+    // SSO vigente pero la app rechaza la sesión sin parar: cortar el bucle.
+    if (!loginLoopGuard.attempt()) {
+      return abortNavigation(createError({ statusCode: 401, statusMessage: LOGIN_LOOP_MESSAGE, fatal: true }))
+    }
     try {
       const location = await useNuxtApp().$leo.transport.login(to.fullPath)
       return navigateTo(location.url, { external: location.external, replace: true })
