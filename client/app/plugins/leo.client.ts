@@ -34,7 +34,9 @@ export default defineNuxtPlugin(async (nuxtApp) => {
     },
     currentPath: () => useRouter().currentRoute.value.fullPath,
     login: (returnTo, reason) => transport.login(returnTo, reason),
-    navigate: location => nuxtApp.runWithContext(() => navigateTo(location.url, { external: location.external, replace: true })),
+    navigate: async (location) => {
+      await nuxtApp.runWithContext(() => navigateTo(location.url, { external: location.external, replace: true }))
+    },
     guard: loginLoopGuard,
     onBlocked: () => showError(createError({ statusCode: 401, statusMessage: LOGIN_LOOP_MESSAGE, fatal: true })),
     onError: err => showError(createError({ statusCode: 503, statusMessage: leoErrorMessage(err), fatal: true }))
