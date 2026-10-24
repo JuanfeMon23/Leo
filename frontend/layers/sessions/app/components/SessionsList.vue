@@ -20,15 +20,18 @@ onMounted(() => {
 const userOptions = computed(() =>
   list.users.value.map(u => ({ value: u.id, label: `${`${u.first_name} ${u.last_name}`.trim()} (${u.username})` })))
 
-const columns: UiDataTableColumn<SessionRead>[] = [
+const canRevoke = useCan('leo.auth.revoke')
+
+// «Acciones» solo existe si hay algo que hacer: sin `leo.auth.revoke` la columna quedaría vacía.
+const columns = computed<UiDataTableColumn<SessionRead>[]>(() => [
   { key: 'user_id', label: 'Usuario' },
   { key: 'created_at', label: 'Inicio' },
   { key: 'last_activity_at', label: 'Última actividad' },
   { key: 'expires_at', label: 'Expira' },
   { key: 'ip', label: 'Desde' },
   { key: 'revoked_at', label: 'Estado' },
-  { key: 'id', label: 'Acciones', class: 'text-right' }
-]
+  ...(canRevoke.value ? [{ key: 'id', label: 'Acciones', class: 'text-right' }] : [])
+])
 </script>
 
 <template>

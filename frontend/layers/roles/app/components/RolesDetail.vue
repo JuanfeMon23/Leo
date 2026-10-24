@@ -84,7 +84,7 @@ const changeSummary = computed(() => {
         </UiAlert>
         <UiAlert v-if="saveError" :message="saveError" data-testid="save-error" />
 
-        <RolesPermissionEditor v-model:selected="selected" :model="model" :readonly="!canEdit || Boolean(catalogError) || saving" />
+        <RolesPermissionEditor v-model:selected="selected" :model="model" :readonly="!canEdit || Boolean(catalogError)" :disabled="saving" />
 
         <LeoCan tag="leo.roles.edit">
           <div

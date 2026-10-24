@@ -60,11 +60,45 @@ describe('página de ajustes', () => {
     expect(wrapper.text()).toContain('Intentos de inicio de sesión')
   })
 
-  it('sin leo.settings.edit el valor no es editable', async () => {
+  it('sin leo.settings.edit: nada que editar, solo el valor como texto', async () => {
     signInWith(['leo.settings.view'])
+    api.mockResolvedValue({ groups: [{ group: 'Seguridad', settings: [setting(), setting({ key: 'login.mfa', type: 'bool', value: true, default: false })] }] })
     const wrapper = await mountSuspended(SettingsIndexPage)
     await flushPromises()
-    expect(wrapper.find('input').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('input').exists()).toBe(false)
+    expect(wrapper.find('[role="switch"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="setting-save"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="setting-reset"]').exists()).toBe(false)
+    const values = wrapper.findAll('[data-testid="setting-readonly"]')
+    expect(values).toHaveLength(2)
+    expect(values[0]!.text()).toContain('5')
+    expect(values[1]!.text()).toContain('Activado')
+    expect(wrapper.find('[data-testid="setting-history"]').exists()).toBe(true)
+  })
+
+  it('con leo.settings.edit pero sin edit-security: lo de seguridad es solo texto y lo común se edita', async () => {
+    signInWith(['leo.settings.view', 'leo.settings.edit'])
+    api.mockResolvedValue({ groups: [{ group: 'Seguridad', settings: [setting(), setting({ key: 'login.lockout', value: 15, requires_security_permission: true })] }] })
+    const wrapper = await mountSuspended(SettingsIndexPage)
+    await flushPromises()
+    const secure = wrapper.get('[data-key="login.lockout"]')
+    expect(secure.find('input').exists()).toBe(false)
+    expect(secure.find('[data-testid="setting-save"]').exists()).toBe(false)
+    expect(secure.find('[data-testid="setting-reset"]').exists()).toBe(false)
+    expect(secure.get('[data-testid="setting-readonly"]').text()).toContain('15')
+    const common = wrapper.get('[data-key="login.max_attempts"]')
+    expect(common.find('input').exists()).toBe(true)
+    expect(common.find('[data-testid="setting-save"]').exists()).toBe(true)
+  })
+
+  it('con leo.settings.edit-security también se edita lo de seguridad', async () => {
+    signInWith(ALL_SETTINGS_TAGS)
+    api.mockResolvedValue({ groups: [{ group: 'Seguridad', settings: [setting({ key: 'login.lockout', requires_security_permission: true })] }] })
+    const wrapper = await mountSuspended(SettingsIndexPage)
+    await flushPromises()
+    const secure = wrapper.get('[data-key="login.lockout"]')
+    expect(secure.find('input').exists()).toBe(true)
+    expect(secure.find('[data-testid="setting-readonly"]').exists()).toBe(false)
   })
 
   it('con leo.settings.edit el valor es editable', async () => {
