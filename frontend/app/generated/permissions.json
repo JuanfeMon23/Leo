@@ -1,0 +1,299 @@
+{
+  "app": "leo",
+  "modules": [
+    {
+      "slug": "applications",
+      "name": "Aplicaciones",
+      "description": "",
+      "actions": [
+        {
+          "tag": "leo.applications.view",
+          "verb": "view",
+          "name": "Consultar aplicaciones",
+          "description": "Ver aplicaciones, sus modulos y acciones",
+          "assignable": true
+        },
+        {
+          "tag": "leo.applications.create",
+          "verb": "create",
+          "name": "Crear aplicaciones",
+          "description": "Registrar aplicaciones, modulos y acciones",
+          "assignable": true
+        },
+        {
+          "tag": "leo.applications.edit",
+          "verb": "edit",
+          "name": "Editar aplicaciones",
+          "description": "Editar aplicaciones, modulos y acciones",
+          "assignable": true
+        },
+        {
+          "tag": "leo.applications.deactivate",
+          "verb": "deactivate",
+          "name": "Desactivar y reactivar aplicaciones",
+          "description": "Desactivar o reactivar aplicaciones, modulos y acciones",
+          "assignable": true
+        },
+        {
+          "tag": "leo.applications.rotate-secret",
+          "verb": "rotate-secret",
+          "name": "Rotar el secreto de una aplicación",
+          "description": "Regenerar el client_secret de una aplicacion",
+          "assignable": true
+        },
+        {
+          "tag": "leo.applications.sync-catalog",
+          "verb": "sync-catalog",
+          "name": "Evento: sincronización de catálogo",
+          "description": "Evento: una app sincroniza su catalogo de modulos y acciones",
+          "assignable": false
+        },
+        {
+          "tag": "leo.applications.grant-service-access",
+          "verb": "grant-service-access",
+          "name": "Conceder acceso entre aplicaciones",
+          "description": "Conceder a una aplicacion roles de otra aplicacion (acceso entre servicios)",
+          "assignable": true
+        }
+      ]
+    },
+    {
+      "slug": "users",
+      "name": "Usuarios",
+      "description": "",
+      "actions": [
+        {
+          "tag": "leo.users.view",
+          "verb": "view",
+          "name": "Consultar usuarios",
+          "description": "Ver usuarios",
+          "assignable": true
+        },
+        {
+          "tag": "leo.users.create",
+          "verb": "create",
+          "name": "Crear usuarios",
+          "description": "Crear usuarios",
+          "assignable": true
+        },
+        {
+          "tag": "leo.users.edit",
+          "verb": "edit",
+          "name": "Editar usuarios",
+          "description": "Editar usuarios",
+          "assignable": true
+        },
+        {
+          "tag": "leo.users.deactivate",
+          "verb": "deactivate",
+          "name": "Desactivar y reactivar usuarios",
+          "description": "Desactivar o reactivar usuarios",
+          "assignable": true
+        },
+        {
+          "tag": "leo.users.unlock",
+          "verb": "unlock",
+          "name": "Desbloquear usuarios",
+          "description": "Desbloquear usuarios bloqueados por intentos fallidos",
+          "assignable": true
+        },
+        {
+          "tag": "leo.users.reset-password",
+          "verb": "reset-password",
+          "name": "Restablecer contraseñas",
+          "description": "Asignar una contrasena nueva a un usuario",
+          "assignable": true
+        },
+        {
+          "tag": "leo.users.assign-roles",
+          "verb": "assign-roles",
+          "name": "Asignar roles a usuarios",
+          "description": "Asignar o quitar roles a un usuario",
+          "assignable": true
+        },
+        {
+          "tag": "leo.users.provision-patient",
+          "verb": "provision-patient",
+          "name": "Aprovisionar pacientes",
+          "description": "Crear usuarios con el rol paciente desde una aplicacion con credencial de servicio",
+          "assignable": true
+        },
+        {
+          "tag": "leo.users.delegated-self-manage",
+          "verb": "delegated-self-manage",
+          "name": "Delegar la autogestión de usuarios",
+          "description": "Editar el perfil y cambiar la contrasena de un usuario sin permisos de Leo en nombre suyo, desde una aplicacion con credencial de servicio y el token de acceso del usuario",
+          "assignable": true
+        }
+      ]
+    },
+    {
+      "slug": "roles",
+      "name": "Roles",
+      "description": "",
+      "actions": [
+        {
+          "tag": "leo.roles.view",
+          "verb": "view",
+          "name": "Consultar roles",
+          "description": "Ver roles y sus acciones",
+          "assignable": true
+        },
+        {
+          "tag": "leo.roles.create",
+          "verb": "create",
+          "name": "Crear roles",
+          "description": "Crear roles",
+          "assignable": true
+        },
+        {
+          "tag": "leo.roles.edit",
+          "verb": "edit",
+          "name": "Editar roles",
+          "description": "Editar roles y sus acciones",
+          "assignable": true
+        },
+        {
+          "tag": "leo.roles.deactivate",
+          "verb": "deactivate",
+          "name": "Desactivar y reactivar roles",
+          "description": "Desactivar o reactivar roles",
+          "assignable": true
+        }
+      ]
+    },
+    {
+      "slug": "auth",
+      "name": "Autenticacion",
+      "description": "",
+      "actions": [
+        {
+          "tag": "leo.auth.view",
+          "verb": "view",
+          "name": "Consultar sesiones",
+          "description": "Ver sesiones activas",
+          "assignable": true
+        },
+        {
+          "tag": "leo.auth.revoke",
+          "verb": "revoke",
+          "name": "Cerrar sesiones de otros usuarios",
+          "description": "Revocar sesiones",
+          "assignable": true
+        },
+        {
+          "tag": "leo.auth.login",
+          "verb": "login",
+          "name": "Evento: inicio de sesión",
+          "description": "Evento: inicio de sesion (exitoso o fallido)",
+          "assignable": false
+        },
+        {
+          "tag": "leo.auth.logout",
+          "verb": "logout",
+          "name": "Evento: cierre de sesión",
+          "description": "Evento: cierre de sesion",
+          "assignable": false
+        },
+        {
+          "tag": "leo.auth.lock",
+          "verb": "lock",
+          "name": "Evento: bloqueo por intentos fallidos",
+          "description": "Evento: usuario bloqueado por intentos fallidos",
+          "assignable": false
+        },
+        {
+          "tag": "leo.auth.idle-timeout",
+          "verb": "idle-timeout",
+          "name": "Evento: cierre por inactividad",
+          "description": "Evento: sesion cerrada por inactividad",
+          "assignable": false
+        },
+        {
+          "tag": "leo.auth.refresh-reuse",
+          "verb": "refresh-reuse",
+          "name": "Evento: reutilización de token",
+          "description": "Evento: reuso de refresh token (familia y sesion revocadas)",
+          "assignable": false
+        },
+        {
+          "tag": "leo.auth.token",
+          "verb": "token",
+          "name": "Evento: emisión de tokens",
+          "description": "Evento: emision o rotacion de tokens en /token",
+          "assignable": false
+        },
+        {
+          "tag": "leo.auth.authorize",
+          "verb": "authorize",
+          "name": "Evento: autorización de acceso",
+          "description": "Evento: autorizacion de una app en /authorize",
+          "assignable": false
+        },
+        {
+          "tag": "leo.auth.service-token",
+          "verb": "service-token",
+          "name": "Evento: emisión de token de servicio",
+          "description": "Evento: emision de un token de servicio (client credentials)",
+          "assignable": false
+        }
+      ]
+    },
+    {
+      "slug": "audit",
+      "name": "Auditoria",
+      "description": "",
+      "actions": [
+        {
+          "tag": "leo.audit.view",
+          "verb": "view",
+          "name": "Consultar auditoría",
+          "description": "Consultar eventos de auditoria",
+          "assignable": true
+        },
+        {
+          "tag": "leo.audit.export",
+          "verb": "export",
+          "name": "Exportar auditoría",
+          "description": "Exportar eventos de auditoria",
+          "assignable": true
+        }
+      ]
+    },
+    {
+      "slug": "settings",
+      "name": "Ajustes",
+      "description": "",
+      "actions": [
+        {
+          "tag": "leo.settings.view",
+          "verb": "view",
+          "name": "Consultar ajustes",
+          "description": "Ver los ajustes del sistema y su historial de cambios",
+          "assignable": true
+        },
+        {
+          "tag": "leo.settings.edit",
+          "verb": "edit",
+          "name": "Editar ajustes",
+          "description": "Editar los ajustes del sistema",
+          "assignable": true
+        },
+        {
+          "tag": "leo.settings.edit-security",
+          "verb": "edit-security",
+          "name": "Editar ajustes de seguridad",
+          "description": "Editar los ajustes de seguridad (bloqueo de login, contrasenas, token de servicio)",
+          "assignable": true
+        },
+        {
+          "tag": "leo.settings.update",
+          "verb": "update",
+          "name": "Evento: ajuste modificado",
+          "description": "Evento: ajuste del sistema modificado",
+          "assignable": false
+        }
+      ]
+    }
+  ]
+}

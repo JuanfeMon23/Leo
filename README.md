@@ -27,6 +27,18 @@ Python 3.13+, [uv](https://docs.astral.sh/uv/), Node.js con [pnpm](https://pnpm.
    pnpm run dev
    ```
 
+## Tags de acciones (contrato backend ↔ frontend)
+
+El catálogo vive en el backend; el frontend lee `frontend/app/generated/permissions.json` (generado y commiteado). Al cambiar tags en `backend/app/core/db/seeds/catalog.py`, regenéralo y commitéalo:
+
+```bash
+cd backend
+uv run python -m app.core.permissions_export          # escribe el JSON
+uv run python -m app.core.permissions_export --check  # sale con 1 si está desalineado
+```
+
+Un test de backend y otro de frontend fallan si el JSON no coincide con el catálogo o si el frontend usa un tag inexistente.
+
 ## Ajustes (backend)
 
 Las políticas (inactividad, vida de tokens y sesión, bloqueo de login, límites de intentos, contraseñas, paginación, export) ya NO son variables de entorno: se editan en la pantalla Ajustes (tabla `settings`, migración 0008). Ya no se usan `LEO_IDLE_TIMEOUT_MINUTES`, `LEO_ACCESS_TOKEN_MINUTES`, `LEO_SESSION_MAX_HOURS`, `LEO_LOGIN_*`, `LEO_SERVICE_TOKEN_*`, `LEO_PROVISION_*` ni `LEO_DELEGATED_*`; si siguen definidas, solo se leen en el primer arranque como valor inicial de la clave que aún no existe. El backend depende de `sdk/python` por ruta local (`uv sync` en `backend/`).
