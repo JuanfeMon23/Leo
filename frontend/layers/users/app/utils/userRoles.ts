@@ -8,38 +8,38 @@ import type {
 } from '../types/users'
 
 const UNKNOWN_APP = 'Aplicación desconocida'
-const byText = (a: string, b: string) => a.localeCompare(b, 'es')
+const byText = (left: string, right: string) => left.localeCompare(right, 'es')
 
-const appName = (apps: UsersApplication[], id: string) => apps.find(a => a.id === id)?.name ?? UNKNOWN_APP
+const appName = (apps: UsersApplication[], id: string) => apps.find(application => application.id === id)?.name ?? UNKNOWN_APP
 
 /** Roles de un usuario agrupados por aplicación (apps y roles en orden alfabético). */
 export function usersGroupRolesByApp(roles: UserRoleRead[], apps: UsersApplication[]): UsersRoleGroup[] {
   const byApp = new Map<string, UserRoleRead[]>()
-  for (const r of roles) byApp.set(r.application_id, [...(byApp.get(r.application_id) ?? []), r])
+  for (const result of roles) byApp.set(result.application_id, [...(byApp.get(result.application_id) ?? []), result])
   return [...byApp.entries()]
     .map(([applicationId, list]) => ({
       applicationId,
       applicationName: appName(apps, applicationId),
-      roles: [...list].sort((a, b) => byText(a.name, b.name)),
-      hasAccess: list.some(r => r.is_active)
+      roles: [...list].sort((left, right) => byText(left.name, right.name)),
+      hasAccess: list.some(result => result.is_active)
     }))
-    .sort((a, b) => byText(a.applicationName, b.applicationName))
+    .sort((left, right) => byText(left.applicationName, right.applicationName))
 }
 
 /** Nombres de las aplicaciones a las que el usuario accede (≥1 rol activo en ellas). */
-export const usersAccessApps = (groups: UsersRoleGroup[]) => groups.filter(g => g.hasAccess).map(g => g.applicationName)
+export const usersAccessApps = (groups: UsersRoleGroup[]) => groups.filter(group => group.hasAccess).map(group => group.applicationName)
 
 /**
  * Opciones del selector «Aplicación → Rol»: solo roles activos de apps
  * activas que el usuario aún no tiene.
  */
 export function usersRoleOptions(roles: UsersRoleOption[], apps: UsersApplication[], assigned: Set<string>) {
-  const activeApps = new Map(apps.filter(a => a.is_active).map(a => [a.id, a.name]))
+  const activeApps = new Map(apps.filter(application => application.is_active).map(application => [application.id, application.name]))
   return roles
-    .filter(r => r.is_active && activeApps.has(r.application_id) && !assigned.has(r.id))
-    .map(r => ({ app: activeApps.get(r.application_id) as string, role: r.name, value: r.id }))
-    .sort((a, b) => byText(a.app, b.app) || byText(a.role, b.role))
-    .map(o => ({ value: o.value, label: `${o.app} → ${o.role}` }))
+    .filter(role => role.is_active && activeApps.has(role.application_id) && !assigned.has(role.id))
+    .map(role => ({ app: activeApps.get(role.application_id) as string, role: role.name, value: role.id }))
+    .sort((left, right) => byText(left.app, right.app) || byText(left.role, right.role))
+    .map(option => ({ value: option.value, label: `${option.app} → ${option.role}` }))
 }
 
 /**
@@ -51,8 +51,8 @@ export function usersEffectivePermissions(roles: UsersRoleWithActions[], apps: U
   for (const role of roles) {
     if (!role.is_active) continue
     const bucket = byApp.get(role.application_id) ?? new Map()
-    for (const a of role.actions) {
-      if (a.is_active && !bucket.has(a.id)) bucket.set(a.id, { id: a.id, name: a.name, tag: a.tag })
+    for (const action of role.actions) {
+      if (action.is_active && !bucket.has(action.id)) bucket.set(action.id, { id: action.id, name: action.name, tag: action.tag })
     }
     byApp.set(role.application_id, bucket)
   }
@@ -61,7 +61,7 @@ export function usersEffectivePermissions(roles: UsersRoleWithActions[], apps: U
     .map(([applicationId, bucket]) => ({
       applicationId,
       applicationName: appName(apps, applicationId),
-      permissions: [...bucket.values()].sort((a, b) => byText(a.name, b.name))
+      permissions: [...bucket.values()].sort((left, right) => byText(left.name, right.name))
     }))
-    .sort((a, b) => byText(a.applicationName, b.applicationName))
+    .sort((left, right) => byText(left.applicationName, right.applicationName))
 }

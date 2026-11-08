@@ -24,8 +24,8 @@ const loadingRoles = ref(false)
 const submitting = ref(false)
 const error = ref<string | null>(null)
 
-const targetOptions = computed(() => targets.value.map(a => ({ value: a.id, label: a.name })))
-const targetName = computed(() => targets.value.find(a => a.id === targetId.value)?.name ?? '')
+const targetOptions = computed(() => targets.value.map(target => ({ value: target.id, label: target.name })))
+const targetName = computed(() => targets.value.find(target => target.id === targetId.value)?.name ?? '')
 
 async function loadTargets() {
   loadingTargets.value = true
@@ -45,7 +45,7 @@ async function loadRoles(applicationId: string) {
   error.value = null
   try {
     const page = await api.listActiveRoles(applicationId)
-    const withPermissions = await Promise.all(page.items.filter(r => r.is_active).map(async (role): Promise<ApplicationsGrantableRole> => {
+    const withPermissions = await Promise.all(page.items.filter(item => item.is_active).map(async (role): Promise<ApplicationsGrantableRole> => {
       try {
         return { id: role.id, slug: role.slug, name: role.name, description: role.description, permissions: await api.getRolePermissions(role.id) }
       } catch {

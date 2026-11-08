@@ -4,9 +4,9 @@ import { createLoginLoopGuard } from './loginGuard'
 function fake() {
   const data = new Map<string, string>()
   return {
-    getItem: (k: string) => data.get(k) ?? null,
-    setItem: (k: string, v: string) => void data.set(k, v),
-    removeItem: (k: string) => void data.delete(k)
+    getItem: (key: string) => data.get(key) ?? null,
+    setItem: (key: string, value: string) => void data.set(key, value),
+    removeItem: (key: string) => void data.delete(key)
   }
 }
 
@@ -17,15 +17,15 @@ describe('createLoginLoopGuard', () => {
   })
 
   it('la ventana de 30 s expira los intentos viejos', () => {
-    let t = 0
+    let timestamp = 0
     const store = fake()
-    const guard = createLoginLoopGuard({ storage: () => store, now: () => t })
+    const guard = createLoginLoopGuard({ storage: () => store, now: () => timestamp })
     guard.attempt()
-    t = 10_000
+    timestamp = 10_000
     guard.attempt()
-    t = 20_000
+    timestamp = 20_000
     expect(guard.attempt()).toBe(false)
-    t = 30_001 // el primero salió de la ventana
+    timestamp = 30_001 // el primero salió de la ventana
     expect(guard.attempt()).toBe(true)
   })
 

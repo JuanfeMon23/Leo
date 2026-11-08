@@ -20,9 +20,11 @@ async def patient(session, make_browser):
     """Paciente con 6 tags de `acuarius`; existen otra app y otro rol."""
     acuarius = await make_client_app(session, slug="acuarius", tags=TAGS)
     secret_app = await make_client_app(session, slug="secretapp", tags=["panel.ver"])
-    await make_role(session, secret_app.app.id, ["secretapp.panel.ver"], slug="rol-ajeno")
+    await make_role(
+        session, secret_app.app.id, ["secretapp.panel.ver"], slug="rol-ajeno"
+    )
     role = await make_role(
-        session, acuarius.app.id, [f"acuarius.{t}" for t in TAGS], slug="paciente"
+        session, acuarius.app.id, [f"acuarius.{tag}" for tag in TAGS], slug="paciente"
     )
     user = await make_user(session)
     await grant(session, user, role)
@@ -35,7 +37,7 @@ async def test_me_de_paciente_es_minimo(session, make_browser):
     body = (await nav.get(ME)).json()
 
     assert body["permissions"] == []  # ningun tag leo.*
-    assert [a["slug"] for a in body["applications"]] == ["acuarius"]
+    assert [application["slug"] for application in body["applications"]] == ["acuarius"]
     assert set(body["applications"][0]) == {"slug", "name", "base_url"}
     blob = json.dumps(body)
     for foreign in FOREIGN:
@@ -110,8 +112,8 @@ async def test_introspect_de_paciente_solo_tags_y_apps_propios(
         )
     ).json()
 
-    assert sorted(info["permissions"]) == sorted(f"acuarius.{t}" for t in TAGS)
-    assert [a["slug"] for a in info["applications"]] == ["acuarius"]
+    assert sorted(info["permissions"]) == sorted(f"acuarius.{tag}" for tag in TAGS)
+    assert [application["slug"] for application in info["applications"]] == ["acuarius"]
     assert set(info["applications"][0]) == {"slug", "name", "base_url"}
     blob = json.dumps(info)
     for foreign in (*FOREIGN, "document"):

@@ -164,7 +164,9 @@ def build_settings_router(store: SettingsStore, deps: SettingsRouterDeps) -> API
             return _error(exc)
         return SettingsOut(
             groups=[
-                SettingGroupOut(group=group, settings=[_setting_out(v) for v in views])
+                SettingGroupOut(
+                    group=group, settings=[_setting_out(view) for view in views]
+                )
                 for group, views in grouped.items()
             ]
         )
@@ -187,7 +189,7 @@ def build_settings_router(store: SettingsStore, deps: SettingsRouterDeps) -> API
         except SettingsError as exc:
             return _error(exc)
         return SettingHistoryPageOut(
-            items=[_history_out(e) for e in result.items],
+            items=[_history_out(entry) for entry in result.items],
             page=result.page,
             page_size=result.page_size,
             total=result.total,

@@ -38,6 +38,6 @@ export function safeReturnUrl(
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
   if (parsed.username || parsed.password) return null
-  const app = applications.find(a => originOf(a.base_url) === parsed.origin)
+  const app = applications.find(application => originOf(application.base_url) === parsed.origin)
   return app ? { url: parsed.href, app } : null
 }

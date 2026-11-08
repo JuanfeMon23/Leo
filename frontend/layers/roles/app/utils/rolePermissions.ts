@@ -47,7 +47,7 @@ export function rolesBuildPermissionModel(
 
   for (const action of assigned) {
     if (known.has(action.id) || isEventAction(action.description)) continue
-    let group = groups.find(g => g.moduleId === action.module.id)
+    let group = groups.find(candidateGroup => candidateGroup.moduleId === action.module.id)
     if (!group) {
       group = { moduleId: action.module.id, slug: action.module.slug, name: action.module.name, description: null, isActive: true, permissions: [] }
       groups.push(group)
@@ -62,12 +62,12 @@ export function rolesBuildPermissionModel(
     })
   }
 
-  return { groups: groups.filter(g => g.permissions.length > 0), events }
+  return { groups: groups.filter(group => group.permissions.length > 0), events }
 }
 
 /** Ids que se pueden marcar en un módulo. */
 export function rolesSelectableIds(group: RolesPermissionGroup): string[] {
-  return group.permissions.filter(p => p.selectable).map(p => p.id)
+  return group.permissions.filter(permission => permission.selectable).map(permission => permission.id)
 }
 
 /** Estado del «seleccionar todo» del módulo, sobre sus permisos asignables. */

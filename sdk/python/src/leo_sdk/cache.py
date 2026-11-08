@@ -38,7 +38,9 @@ class TTLCache[V]:
             return
         now = self._clock()
         if len(self._items) >= self._max and key not in self._items:
-            self._items = {k: v for k, v in self._items.items() if v[0] > now}
+            self._items = {
+                key: entry for key, entry in self._items.items() if entry[0] > now
+            }
             while len(self._items) >= self._max:  # sigue lleno: descarta el mas viejo
                 del self._items[next(iter(self._items))]
         self._items[key] = (now + self._ttl, value)

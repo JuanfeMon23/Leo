@@ -71,11 +71,15 @@ SECURITY = {"X-Perms": "view,edit,edit-security"}
 
 
 async def test_list_grouped_with_full_contract(api):
-    r = await api.get("/settings", headers=VIEW)
-    assert r.status_code == 200
-    groups = r.json()["groups"]
-    assert [g["group"] for g in groups] == ["auth", "ui"]
-    item = next(s for s in groups[0]["settings"] if s["key"] == "auth.max_attempts")
+    response = await api.get("/settings", headers=VIEW)
+    assert response.status_code == 200
+    groups = response.json()["groups"]
+    assert [group["group"] for group in groups] == ["auth", "ui"]
+    item = next(
+        setting
+        for setting in groups[0]["settings"]
+        if setting["key"] == "auth.max_attempts"
+    )
     assert item == {
         "key": "auth.max_attempts",
         "type": "int",
@@ -101,75 +105,86 @@ async def test_view_permission_required(api):
 
 async def test_edit_requires_edit_permission(api):
     body = {"value": 45, "reason": "motivo", "expected_version": 1}
-    r = await api.put("/settings/auth.idle_minutes", json=body, headers=VIEW)
-    assert r.status_code == 403
+    response = await api.put("/settings/auth.idle_minutes", json=body, headers=VIEW)
+    assert response.status_code == 403
 
 
 async def test_edit_ok_audits_and_returns_new_state(api, audit_calls):
     body = {"value": 45, "reason": "Nueva política", "expected_version": 1}
-    r = await api.put("/settings/auth.idle_minutes", json=body, headers=EDIT)
-    assert r.status_code == 200, r.text
+    response = await api.put("/settings/auth.idle_minutes", json=body, headers=EDIT)
+    assert response.status_code == 200, response.text
     assert (
-        r.json()["value"],
-        r.json()["version"],
-        r.json()["updated_by_username"],
+        response.json()["value"],
+        response.json()["version"],
+        response.json()["updated_by_username"],
     ) == (
         45,
         2,
         "ana",
     )
     assert audit_calls == [("ana", "auth.idle_minutes", 30, 45, "Nueva política")]
-    h = await api.get("/settings/auth.idle_minutes/history", headers=VIEW)
-    assert h.status_code == 200
-    page = h.json()
+    history_response = await api.get(
+        "/settings/auth.idle_minutes/history", headers=VIEW
+    )
+    assert history_response.status_code == 200
+    page = history_response.json()
     assert page["total"] == 1 and page["items"][0]["request_id"] == "rq-1"
     assert (page["items"][0]["old_value"], page["items"][0]["new_value"]) == (30, 45)
 
 
 async def test_security_key_requires_third_permission(api, audit_calls):
     body = {"value": 6, "reason": "motivo", "expected_version": 1}
-    r = await api.put("/settings/auth.max_attempts", json=body, headers=EDIT)
-    assert r.status_code == 403 and audit_calls == []
-    r = await api.put("/settings/auth.max_attempts", json=body, headers=SECURITY)
-    assert r.status_code == 200 and r.json()["value"] == 6
+    response = await api.put("/settings/auth.max_attempts", json=body, headers=EDIT)
+    assert response.status_code == 403 and audit_calls == []
+    response = await api.put("/settings/auth.max_attempts", json=body, headers=SECURITY)
+    assert response.status_code == 200 and response.json()["value"] == 6
 
 
 async def test_errors_are_code_message_details(api, audit_calls):
     ok = {"value": 45, "reason": "motivo", "expected_version": 1}
 
-    r = await api.put(
+    response = await api.put(
         "/settings/auth.idle_minutes", json={**ok, "value": 999}, headers=EDIT
     )
-    assert r.status_code == 422
-    assert r.json()["code"] == "setting_out_of_range"
-    assert r.json()["details"]["min"] == 5 and r.json()["details"]["max"] == 120
-    assert "entre 5 y 120" in r.json()["message"]
+    assert response.status_code == 422
+    assert response.json()["code"] == "setting_out_of_range"
+    assert (
+        response.json()["details"]["min"] == 5
+        and response.json()["details"]["max"] == 120
+    )
+    assert "entre 5 y 120" in response.json()["message"]
 
-    r = await api.put(
+    response = await api.put(
         "/settings/auth.idle_minutes", json={**ok, "value": "45"}, headers=EDIT
     )
-    assert (r.status_code, r.json()["code"]) == (422, "setting_type_mismatch")
+    assert (response.status_code, response.json()["code"]) == (
+        422,
+        "setting_type_mismatch",
+    )
 
     for reason in ("ab", "", None):
-        r = await api.put(
+        response = await api.put(
             "/settings/auth.idle_minutes", json={**ok, "reason": reason}, headers=EDIT
         )
-        assert (r.status_code, r.json()["code"]) == (422, "reason_required")
+        assert (response.status_code, response.json()["code"]) == (
+            422,
+            "reason_required",
+        )
 
     await api.put("/settings/auth.idle_minutes", json=ok, headers=EDIT)
-    r = await api.put("/settings/auth.idle_minutes", json=ok, headers=EDIT)
-    assert (r.status_code, r.json()["code"]) == (409, "version_conflict")
-    assert r.json()["details"]["current_version"] == 2
+    response = await api.put("/settings/auth.idle_minutes", json=ok, headers=EDIT)
+    assert (response.status_code, response.json()["code"]) == (409, "version_conflict")
+    assert response.json()["details"]["current_version"] == 2
 
-    r = await api.put("/settings/no.existe", json=ok, headers=EDIT)
-    assert (r.status_code, r.json()["code"]) == (404, "setting_not_found")
-    r = await api.get("/settings/no.existe/history", headers=VIEW)
-    assert (r.status_code, r.json()["code"]) == (404, "setting_not_found")
+    response = await api.put("/settings/no.existe", json=ok, headers=EDIT)
+    assert (response.status_code, response.json()["code"]) == (404, "setting_not_found")
+    response = await api.get("/settings/no.existe/history", headers=VIEW)
+    assert (response.status_code, response.json()["code"]) == (404, "setting_not_found")
 
-    r = await api.put(
+    response = await api.put(
         "/settings/auth.idle_minutes", json={"reason": "motivo"}, headers=EDIT
     )
-    assert r.status_code == 422
+    assert response.status_code == 422
     assert len(audit_calls) == 1  # solo el cambio valido
 
 
@@ -180,9 +195,9 @@ async def test_history_pagination(api):
             json={"value": value, "reason": "cambio", "expected_version": version},
             headers=EDIT,
         )
-    r = await api.get(
+    response = await api.get(
         "/settings/auth.idle_minutes/history?page=2&page_size=2", headers=VIEW
     )
-    assert r.json()["total"] == 3 and len(r.json()["items"]) == 1
+    assert response.json()["total"] == 3 and len(response.json()["items"]) == 1
     bad = await api.get("/settings/auth.idle_minutes/history?page=0", headers=VIEW)
     assert bad.status_code == 422

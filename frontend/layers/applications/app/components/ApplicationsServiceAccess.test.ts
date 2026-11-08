@@ -26,12 +26,12 @@ const appRow = (id: string, slug: string, name: string) => ({
   id, slug, name, description: null, base_url: '', redirect_uris: [], client_id: slug, is_active: true, created_at: '', updated_at: ''
 })
 
-function route(handlers: Record<string, unknown | ((o: any) => unknown)>) {
+function route(handlers: Record<string, unknown | ((options: any) => unknown)>) {
   api.mockImplementation(async (url: string, opts: { method?: string } = {}) => {
     const key = `${opts.method ?? 'GET'} ${url}`
-    const h = handlers[key]
-    if (h === undefined) throw new Error(`sin handler: ${key}`)
-    const out = typeof h === 'function' ? (h as (o: unknown) => unknown)(opts) : h
+    const handler = handlers[key]
+    if (handler === undefined) throw new Error(`sin handler: ${key}`)
+    const out = typeof handler === 'function' ? (handler as (options: unknown) => unknown)(opts) : handler
     if (out instanceof Error) throw out
     return out
   })
@@ -41,9 +41,9 @@ const body = () => document.body
 const byId = (id: string) => body().querySelector<HTMLElement>(`[data-testid="${id}"]`)
 const click = async (id: string) => { byId(id)!.click(); await flushPromises() }
 const dialogButton = (label: string) =>
-  [...body().querySelectorAll('[role="dialog"] button')].find(b => b.textContent?.trim() === label) as HTMLElement
+  [...body().querySelectorAll('[role="dialog"] button')].find(button => button.textContent?.trim() === label) as HTMLElement
 
-async function mountSection(handlers: Record<string, unknown | ((o: any) => unknown)> = {}) {
+async function mountSection(handlers: Record<string, unknown | ((options: any) => unknown)> = {}) {
   route({ 'GET /applications/i1/service-access': [grant('g1', 'Lector'), grant('g2', 'Analista')], ...handlers })
   const wrapper = await mountSuspended(ApplicationsServiceAccess, { props: { appId: 'i1', appName: 'Incubus' }, attachTo: document.body })
   await flushPromises()
@@ -62,7 +62,7 @@ describe('ApplicationsServiceAccess (lista)', () => {
     const groups = wrapper.findAll('[data-testid="service-group"]')
     expect(groups).toHaveLength(1)
     expect(groups[0]!.text()).toContain('Vladimir')
-    expect(wrapper.findAll('[data-testid="grant-role-name"]').map(e => e.text())).toEqual(['Rol: Analista', 'Rol: Lector'])
+    expect(wrapper.findAll('[data-testid="grant-role-name"]').map(element => element.text())).toEqual(['Rol: Analista', 'Rol: Lector'])
     expect(wrapper.find('[data-testid="perm-name"]').text()).toBe('Consultar muestras')
     const tag = wrapper.find('[data-testid="perm-tag"]')
     expect(tag.text()).toBe('vladimir.samples.view')
@@ -129,7 +129,7 @@ describe('ApplicationsServiceAccess (conceder)', () => {
 
   it('el selector no ofrece la app actual ni leo; pide roles activos de la elegida', async () => {
     await open()
-    const options = [...body().querySelectorAll('[data-testid="grant-target"] option, select[data-testid="grant-target"] option')].map(o => o.textContent?.trim())
+    const options = [...body().querySelectorAll('[data-testid="grant-target"] option, select[data-testid="grant-target"] option')].map(option => option.textContent?.trim())
     expect(options).toContain('Vladimir')
     expect(options).not.toContain('Incubus')
     expect(options).not.toContain('Leo')
@@ -167,7 +167,7 @@ describe('permiso leo.applications.grant-service-access en el detalle', () => {
   }
 
   it('sin el tag la sección no se renderiza ni consulta', async () => {
-    signInWith(ALL_APPLICATIONS_TAGS.filter(t => t !== 'leo.applications.grant-service-access'))
+    signInWith(ALL_APPLICATIONS_TAGS.filter(tag => tag !== 'leo.applications.grant-service-access'))
     api.mockResolvedValue(detail)
     const wrapper = await mountSuspended(ApplicationsDetail, { props: { id: 'i1' }, attachTo: document.body })
     await flushPromises()

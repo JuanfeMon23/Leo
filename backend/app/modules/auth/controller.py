@@ -181,7 +181,10 @@ async def rate_rule(limit_key: str) -> dict[str, int]:
     `rate_limit.<...>` + `rate_limit.window_seconds`), para pasarlos al
     limitador en cada llamada."""
     values = await runtime_settings.get_many(limit_key, "rate_limit.window_seconds")
-    return {"limit": values[limit_key], "window_seconds": values["rate_limit.window_seconds"]}
+    return {
+        "limit": values[limit_key],
+        "window_seconds": values["rate_limit.window_seconds"],
+    }
 
 
 async def failure_rule() -> dict[str, int]:
@@ -443,7 +446,12 @@ async def me(session: AsyncSession, principal: Principal) -> MeResponse:
         ),
         permissions=sorted(principal.permissions),
         applications=[
-            MeApplication(slug=a.slug, name=a.name, base_url=a.base_url) for a in apps
+            MeApplication(
+                slug=application.slug,
+                name=application.name,
+                base_url=application.base_url,
+            )
+            for application in apps
         ],
     )
 
@@ -529,8 +537,8 @@ async def _edit_profile(
             session, who.user_id, data.current_password
         ):
             await limiters.password_failures.hit(
-            user_key, now, window_seconds=(await failure_rule())["window_seconds"]
-        )
+                user_key, now, window_seconds=(await failure_rule())["window_seconds"]
+            )
             await audit.record_and_commit(
                 session,
                 who.actor.entry(
@@ -543,7 +551,9 @@ async def _edit_profile(
                     ),
                 ),
             )
-            raise ForbiddenError(INVALID_CURRENT_PASSWORD, code="invalid_current_password")
+            raise ForbiddenError(
+                INVALID_CURRENT_PASSWORD, code="invalid_current_password"
+            )
         await limiters.password_failures.reset(user_key)
     if await users.update_own_profile(session, who.user_id, data, who.actor, who.via):
         if email_change:
@@ -1295,7 +1305,12 @@ async def introspect(
         exp=int(owner.token.expires_at.timestamp()),
         idle_timeout_seconds=await _idle_seconds(),
         applications=[
-            MeApplication(slug=a.slug, name=a.name, base_url=a.base_url) for a in apps
+            MeApplication(
+                slug=application.slug,
+                name=application.name,
+                base_url=application.base_url,
+            )
+            for application in apps
         ],
         last_activity_at=owner.last_activity_at,
     )

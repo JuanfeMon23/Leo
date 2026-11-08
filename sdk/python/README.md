@@ -54,8 +54,12 @@ Requisito: un admin de Leo concede a tu app un rol de la app destino (`/applicat
 
 ```python
 provider = ServiceTokenProvider(LeoClient(LeoSettings()))
-http = httpx.AsyncClient(base_url="https://vladimir.example", auth=provider.auth("vladimir"))
-await http.get("/things")  # Bearer automatico; ante 401 renueva el token y reintenta una vez
+http = httpx.AsyncClient(
+    base_url="https://vladimir.example", auth=provider.auth("vladimir")
+)
+await http.get(
+    "/things"
+)  # Bearer automatico; ante 401 renueva el token y reintenta una vez
 # o a mano: await provider.headers("vladimir") -> {"Authorization": "Bearer ..."}
 ```
 
@@ -67,8 +71,12 @@ Requisito: un admin de Leo concede a tu app el rol de servicio `leo-self-service
 
 ```python
 client = LeoClient(LeoSettings())
-profile = await client.update_user_profile(user_access_token, first_name="Laura", email="n@x.com", current_password="...")
-await client.change_user_password(user_access_token, current_password="...", new_password="...")
+profile = await client.update_user_profile(
+    user_access_token, first_name="Laura", email="n@x.com", current_password="..."
+)
+await client.change_user_password(
+    user_access_token, current_password="...", new_password="..."
+)
 ```
 
 `current_password` es obligatoria para cambiar de correo y para cambiar la contraseña. Errores (`LeoError` con `code`): `invalid_token` (`InvalidTokenError`; `.is_user_token` si falla el token del usuario, no se reintenta), `forbidden`, `current_password_required`, `invalid_current_password`, `invalid_credentials`, `weak_password`, `same_password`, `duplicate`, `too_many_attempts` (`TooManyAttemptsError.retry_after`). Un 401 del token de servicio renueva el token y reintenta una vez.

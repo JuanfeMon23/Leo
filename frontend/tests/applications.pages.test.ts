@@ -35,13 +35,13 @@ describe('menú lateral', () => {
   it('muestra «Aplicaciones» con leo.applications.view', async () => {
     signInWith(['leo.applications.view'])
     const wrapper = await mountSuspended(DefaultLayout)
-    const link = wrapper.findAll('a').find(a => a.text().includes('Aplicaciones'))
+    const link = wrapper.findAll('a').find(navLink => navLink.text().includes('Aplicaciones'))
     expect(link?.attributes('href')).toBe('/applications')
   })
 
   it('no la muestra sin ese tag', async () => {
     signInWith(['leo.users.view'])
     const wrapper = await mountSuspended(DefaultLayout)
-    expect(wrapper.findAll('a').some(a => a.text().includes('Aplicaciones'))).toBe(false)
+    expect(wrapper.findAll('a').some(link => link.text().includes('Aplicaciones'))).toBe(false)
   })
 })

@@ -25,6 +25,6 @@ export interface ForbiddenDetails {
  */
 export function forbiddenMessage(details: ForbiddenDetails | null | undefined, fallback: string): string {
   const tags = details?.any_of?.length ? details.any_of : details?.action ? [details.action] : []
-  const names = [...new Set(tags.map(tag => permissionName(tag)).filter((n): n is string => !!n))]
+  const names = [...new Set(tags.map(tag => permissionName(tag)).filter((name): name is string => !!name))]
   return names.length ? `No tienes permiso para: ${names.join(' o ')}` : fallback
 }

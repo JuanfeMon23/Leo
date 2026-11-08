@@ -18,14 +18,14 @@ const valid = {
   password: 'Segura-Clave-2026'
 }
 const issues = (input: unknown) => {
-  const r = userCreate.safeParse(input)
-  return r.success ? {} : Object.fromEntries(r.error.issues.map(i => [i.path.join('.'), i.message])) as Record<string, string>
+  const result = userCreate.safeParse(input)
+  return result.success ? {} : Object.fromEntries(result.error.issues.map(i => [i.path.join('.'), i.message])) as Record<string, string>
 }
 
 describe('userCreateSchema', () => {
   it('acepta datos válidos y normaliza usuario (minúsculas) y documento (mayúsculas)', () => {
-    const r = userCreate.parse({ ...valid, username: ' Ana.Perez ', document_number: ' ab-12 ', email: ' ana@x.co ' })
-    expect(r).toMatchObject({ username: 'ana.perez', document_number: 'AB-12', email: 'ana@x.co', first_name: 'Ana' })
+    const result = userCreate.parse({ ...valid, username: ' Ana.Perez ', document_number: ' ab-12 ', email: ' ana@x.co ' })
+    expect(result).toMatchObject({ username: 'ana.perez', document_number: 'AB-12', email: 'ana@x.co', first_name: 'Ana' })
   })
 
   it('usuario: 3–64, sin @, formato del backend', () => {

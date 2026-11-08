@@ -66,7 +66,9 @@ def _value(settings: SeedSettings, field: str) -> str | None:
 
 def load_seed_config(settings: SeedSettings) -> SeedConfig:
     values = {field: _value(settings, field) for field in REQUIRED}
-    missing = [_env_name(f) for f, v in values.items() if v is None]
+    missing = [
+        _env_name(field_name) for field_name, value in values.items() if value is None
+    ]
     if missing:
         raise SeedConfigError(
             "Faltan variables en backend/.env para la semilla: "
@@ -84,10 +86,10 @@ def load_seed_config(settings: SeedSettings) -> SeedConfig:
     if not re.match(EMAIL_PATTERN, email):
         errors.append("LEO_ADMIN_EMAIL no es un email valido.")
     document_type = values["admin_document_type"].upper()
-    if document_type not in {t.value for t in DocumentType}:
+    if document_type not in {member.value for member in DocumentType}:
         errors.append(
             "LEO_ADMIN_DOCUMENT_TYPE no es valido; usa uno de: "
-            f"{', '.join(t.value for t in DocumentType)}."
+            f"{', '.join(member.value for member in DocumentType)}."
         )
     document_number = values["admin_document_number"].upper()
     if not re.match(DOCUMENT_NUMBER_PATTERN, document_number):

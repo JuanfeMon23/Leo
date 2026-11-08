@@ -277,7 +277,9 @@ class SettingsStore:
             raise SettingsUnavailableError from exc
         by_key = {row.key: row for row in rows}
         grouped: dict[str, list[SettingView]] = {}
-        for definition in sorted(self.registry, key=lambda d: (d.group, d.key)):
+        for definition in sorted(
+            self.registry, key=lambda registered: (registered.group, registered.key)
+        ):
             grouped.setdefault(definition.group, []).append(
                 self._view(definition, by_key.get(definition.key))
             )
@@ -316,18 +318,18 @@ class SettingsStore:
             raise SettingsUnavailableError from exc
         items = [
             HistoryEntry(
-                id=r.id,
-                setting_key=r.setting_key,
-                old_value=r.old_value,
-                new_value=r.new_value,
-                version_after=r.version_after,
-                changed_by=r.changed_by,
-                changed_by_username=r.changed_by_username,
-                changed_at=r.changed_at,
-                reason=r.reason,
-                request_id=r.request_id,
+                id=row.id,
+                setting_key=row.setting_key,
+                old_value=row.old_value,
+                new_value=row.new_value,
+                version_after=row.version_after,
+                changed_by=row.changed_by,
+                changed_by_username=row.changed_by_username,
+                changed_at=row.changed_at,
+                reason=row.reason,
+                request_id=row.request_id,
             )
-            for r in rows
+            for row in rows
         ]
         return HistoryPage(items=items, page=page, page_size=page_size, total=total)
 
@@ -474,7 +476,7 @@ class SettingsStore:
                     .on_conflict_do_nothing(index_elements=["key"])
                     .returning(model.key)
                 )
-                inserted = [r[0] for r in result.all()]
+                inserted = [row[0] for row in result.all()]
             keys = self.registry.keys()
             rows = (
                 (

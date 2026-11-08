@@ -11,9 +11,9 @@ describe('profilePasswordErrors', () => {
 
   it('weak_password: campo nuevo, con los requisitos incumplidos en minúscula', () => {
     const err = new LeoApiError(422, 'weak_password', 'Contraseña débil.', { password: ['Una letra mayúscula', 'Un número'] })
-    const r = profilePasswordErrors(err)
-    expect(r.form).toBeNull()
-    expect(r.fields.new_password).toBe('La contraseña no cumple la política: una letra mayúscula; un número.')
+    const result = profilePasswordErrors(err)
+    expect(result.form).toBeNull()
+    expect(result.fields.new_password).toBe('La contraseña no cumple la política: una letra mayúscula; un número.')
   })
 
   it('weak_password sin detalle: mensaje genérico legible', () => {
@@ -36,10 +36,10 @@ describe('profilePasswordErrors', () => {
   })
 
   it('error de red o desconocido: mensaje legible, no el crudo', () => {
-    const r = profilePasswordErrors(new TypeError('Failed to fetch'))
-    expect(r.fields).toEqual({})
-    expect(r.form).toBeTruthy()
-    expect(r.form).not.toMatch(/failed to fetch/i)
+    const result = profilePasswordErrors(new TypeError('Failed to fetch'))
+    expect(result.fields).toEqual({})
+    expect(result.form).toBeTruthy()
+    expect(result.form).not.toMatch(/failed to fetch/i)
   })
 })
 
@@ -48,9 +48,9 @@ describe('errores del perfil con mapApiErrorToForm', () => {
 
   it('409 duplicate con details.email: mensaje en el campo del correo', () => {
     const err = new LeoApiError(409, 'duplicate', 'Ya existe un usuario con el email «a@x.co».', { email: 'a@x.co' })
-    const r = mapApiErrorToForm(err, { fields })
-    expect(r.formError).toBeNull()
-    expect(r.fieldErrors.email).toContain('Ya existe un usuario con el email')
+    const result = mapApiErrorToForm(err, { fields })
+    expect(result.formError).toBeNull()
+    expect(result.fieldErrors.email).toContain('Ya existe un usuario con el email')
   })
 
   it('422 validation_error con details [{field,message}]: cada campo con su mensaje', () => {
@@ -58,9 +58,9 @@ describe('errores del perfil con mapApiErrorToForm', () => {
       { field: 'body.first_name', message: 'Demasiado largo.' },
       { field: 'body.email', message: 'Correo inválido.' }
     ])
-    const r = mapApiErrorToForm(err, { fields })
-    expect(r.formError).toBeNull()
-    expect(r.fieldErrors).toEqual({ first_name: 'Demasiado largo.', email: 'Correo inválido.' })
+    const result = mapApiErrorToForm(err, { fields })
+    expect(result.formError).toBeNull()
+    expect(result.fieldErrors).toEqual({ first_name: 'Demasiado largo.', email: 'Correo inválido.' })
   })
 })
 

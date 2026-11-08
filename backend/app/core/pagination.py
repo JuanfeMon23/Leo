@@ -70,11 +70,15 @@ ActiveQuery = Annotated[
 ]
 
 
-def search[StmtT: Select](stmt: StmtT, q: str | None, *columns: ColumnElement) -> StmtT:
-    for term in (q or "").split()[:SEARCH_MAX_TERMS]:
+def search[StmtT: Select](
+    stmt: StmtT, search_text: str | None, *columns: ColumnElement
+) -> StmtT:
+    for term in (search_text or "").split()[:SEARCH_MAX_TERMS]:
         escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         pattern = f"%{escaped}%"
-        stmt = stmt.where(or_(*(c.ilike(pattern, escape="\\") for c in columns)))
+        stmt = stmt.where(
+            or_(*(column.ilike(pattern, escape="\\") for column in columns))
+        )
     return stmt
 
 

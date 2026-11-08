@@ -36,7 +36,7 @@ async def _public_objects(engine: AsyncEngine) -> tuple[list[str], list[str]]:
                 "ON n.oid = p.pronamespace WHERE n.nspname = 'public'"
             )
         )
-        return sorted(r[0] for r in tables), sorted(r[0] for r in functions)
+        return sorted(row[0] for row in tables), sorted(row[0] for row in functions)
 
 
 async def test_upgrade_head_coincide_con_los_modelos(engine: AsyncEngine) -> None:
@@ -72,7 +72,7 @@ async def _session_columns(engine: AsyncEngine) -> set[str]:
                 "WHERE table_schema = 'public' AND table_name = 'sessions'"
             )
         )
-        return {r[0] for r in rows}
+        return {row[0] for row in rows}
 
 
 async def test_0002_rellena_secret_hash_y_revoca_sesiones_previas(
@@ -98,8 +98,8 @@ async def test_0002_rellena_secret_hash_y_revoca_sesiones_previas(
         alembic("upgrade", "head")
         async with engine.connect() as connection:
             rows = {
-                r.id: r
-                for r in await connection.execute(
+                row.id: row
+                for row in await connection.execute(
                     text(
                         "SELECT id, secret_hash, revoked_at, revoked_reason "
                         "FROM sessions WHERE user_id = :u"
@@ -107,7 +107,9 @@ async def test_0002_rellena_secret_hash_y_revoca_sesiones_previas(
                     {"u": user_id},
                 )
             }
-        assert all(re.fullmatch(r"[0-9a-f]{64}", r.secret_hash) for r in rows.values())
+        assert all(
+            re.fullmatch(r"[0-9a-f]{64}", row.secret_hash) for row in rows.values()
+        )
         assert rows[live].secret_hash != rows[closed].secret_hash
         assert rows[live].revoked_at is not None
         assert rows[live].revoked_reason == "admin"
@@ -230,7 +232,7 @@ async def _action_columns(engine: AsyncEngine) -> set[str]:
                 "WHERE table_schema = 'public' AND table_name = 'actions'"
             )
         )
-        return {r[0] for r in rows}
+        return {row[0] for row in rows}
 
 
 async def test_0003_rellena_nombre_de_acciones_existentes(
@@ -278,15 +280,15 @@ async def test_0003_rellena_nombre_de_acciones_existentes(
         alembic("upgrade", "head")
         async with engine.connect() as connection:
             names = {
-                r.tag: r.name
-                for r in await connection.execute(
+                row.tag: row.name
+                for row in await connection.execute(
                     text(
                         "SELECT tag, name FROM actions WHERE application_id = ANY(:a)"
                     ),
                     {"a": app_ids},
                 )
             }
-        tool = next(t.split(".")[0] for t in names if not t.startswith("leo."))
+        tool = next(name.split(".")[0] for name in names if not name.startswith("leo."))
         assert names["leo.users.view"] == "Consultar usuarios"
         assert names["leo.users.reset-password"] == "Restablecer contraseñas"
         assert names[f"{tool}.items.rotate-secret"] == "Rotate secret"
@@ -333,8 +335,8 @@ async def test_0005_admite_password_change_y_el_downgrade_lo_reasigna_a_admin(
         alembic("downgrade", "0004")
         async with engine.connect() as connection:
             reasons = {
-                r.id: r.revoked_reason
-                for r in await connection.execute(
+                row.id: row.revoked_reason
+                for row in await connection.execute(
                     text("SELECT id, revoked_reason FROM sessions WHERE user_id = :u"),
                     {"u": user_id},
                 )
@@ -376,7 +378,9 @@ async def test_0008_sube_y_baja_ajustes_con_su_historial(engine: AsyncEngine) ->
         alembic("upgrade", "head")
     assert new_tables <= await _public_tables(engine)
     async with engine.connect() as connection:
-        rows = (await connection.execute(text("SELECT count(*) FROM settings"))).scalar_one()
+        rows = (
+            await connection.execute(text("SELECT count(*) FROM settings"))
+        ).scalar_one()
         triggers = (
             await connection.execute(
                 text(

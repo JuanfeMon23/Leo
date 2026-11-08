@@ -31,9 +31,9 @@ def test_valid_proof_returns_jkt() -> None:
 
 
 def test_thumbprint_is_canonical_and_ignores_extra_members() -> None:
-    a = {"kty": "EC", "crv": "P-256", "x": "AQ", "y": "Ag", "kid": "k"}
-    b = {"y": "Ag", "x": "AQ", "crv": "P-256", "kty": "EC"}
-    assert jwk_thumbprint(a) == jwk_thumbprint(b)
+    jwk_ordered = {"kty": "EC", "crv": "P-256", "x": "AQ", "y": "Ag", "kid": "k"}
+    jwk_reordered = {"y": "Ag", "x": "AQ", "crv": "P-256", "kty": "EC"}
+    assert jwk_thumbprint(jwk_ordered) == jwk_thumbprint(jwk_reordered)
 
 
 def test_wrong_signature_other_key() -> None:
@@ -162,10 +162,10 @@ def test_typ_must_be_dpop_jwt() -> None:
 
 def test_jwk_with_private_member_d() -> None:
     key = DpopKey()
-    d = b64url_encode(
+    private_member = b64url_encode(
         key.private_key.private_numbers().private_value.to_bytes(32, "big")
     )
-    jwk = {**key.public_jwk, "d": d}
+    jwk = {**key.public_jwk, "d": private_member}
     with pytest.raises(DpopError, match="privados"):
         check(key.proof("GET", HTU, iat=NOW, header={"jwk": jwk}))
 

@@ -44,7 +44,7 @@ export const auditFieldLabel = (field: string) => FIELD_LABELS[field] ?? field
 export function auditFormatValue(value: unknown): string {
   if (value === null || value === undefined || value === '') return EMPTY_VALUE
   if (typeof value === 'boolean') return value ? 'Sí' : 'No'
-  if (Array.isArray(value)) return value.length ? value.map(v => (typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v))).join(', ') : EMPTY_VALUE
+  if (Array.isArray(value)) return value.length ? value.map(item => (typeof item === 'object' && item !== null ? JSON.stringify(item) : String(item))).join(', ') : EMPTY_VALUE
   if (typeof value === 'object') return JSON.stringify(value)
   return String(value)
 }

@@ -25,8 +25,8 @@ watch(open, (isOpen) => { if (!isOpen) form.reset() })
 
 const values = form.values as { password?: string }
 
-const onSubmit = form.submit(async (v) => {
-  const saved = await api.resetPassword(props.user.id, v.password)
+const onSubmit = form.submit(async (formValues) => {
+  const saved = await api.resetPassword(props.user.id, formValues.password)
   toast.success(`Contraseña de «${usersFullName(props.user)}» actualizada. Sus sesiones abiertas se cerraron.`)
   emit('saved', saved)
   open.value = false

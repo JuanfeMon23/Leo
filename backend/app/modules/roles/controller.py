@@ -79,8 +79,10 @@ async def accessible_applications(
     session: AsyncSession, user_id: UUID
 ) -> list[AppAccess]:
     return [
-        AppAccess(id=a.id, slug=a.slug, name=a.name, base_url=a.base_url)
-        for a in await repository.accessible_applications(session, user_id)
+        AppAccess(
+            id=action.id, slug=action.slug, name=action.name, base_url=action.base_url
+        )
+        for action in await repository.accessible_applications(session, user_id)
     ]
 
 
@@ -105,16 +107,22 @@ async def active_role_brief(
     session: AsyncSession, app_slug: str, role_slug: str
 ) -> RoleBrief | None:
     """Rol activo (de app activa) por slugs, p. ej. `acuarius`/`paciente`."""
-    r = await repository.active_role_by_slugs(session, app_slug, role_slug)
-    return RoleBrief(r.id, r.application_id, r.slug, r.name, r.is_active) if r else None
+    role = await repository.active_role_by_slugs(session, app_slug, role_slug)
+    return (
+        RoleBrief(role.id, role.application_id, role.slug, role.name, role.is_active)
+        if role
+        else None
+    )
 
 
 async def roles_brief(
     session: AsyncSession, role_ids: list[UUID]
 ) -> dict[UUID, RoleBrief]:
     return {
-        r.id: RoleBrief(r.id, r.application_id, r.slug, r.name, r.is_active)
-        for r in (await repository.roles_by_id(session, role_ids)).values()
+        role.id: RoleBrief(
+            role.id, role.application_id, role.slug, role.name, role.is_active
+        )
+        for role in (await repository.roles_by_id(session, role_ids)).values()
     }
 
 
@@ -124,11 +132,11 @@ async def roles_brief(
 async def list_roles(
     session: AsyncSession,
     application_id: UUID | None,
-    q: str | None,
+    search_text: str | None,
     active: bool | None,
     pagination: Pagination,
 ) -> Page[RoleRead]:
-    stmt = repository.list_statement(application_id, q, active)
+    stmt = repository.list_statement(application_id, search_text, active)
     return await paginate(session, stmt, pagination, RoleRead, Role.slug)
 
 
@@ -138,15 +146,17 @@ async def _detail(session: AsyncSession, role: Role) -> RoleDetail:
         **RoleRead.model_validate(role).model_dump(),
         actions=[
             RoleActionRead(
-                id=a.id,
-                tag=a.tag,
-                verb=a.verb,
-                name=a.name,
-                description=a.description,
-                is_active=a.is_active,
-                module=RoleActionModule(id=m.id, slug=m.slug, name=m.name),
+                id=action.id,
+                tag=action.tag,
+                verb=action.verb,
+                name=action.name,
+                description=action.description,
+                is_active=action.is_active,
+                module=RoleActionModule(
+                    id=module.id, slug=module.slug, name=module.name
+                ),
             )
-            for a, m in rows
+            for action, module in rows
         ],
     )
 
@@ -212,7 +222,7 @@ async def add_actions(
 ) -> RoleDetail:
     role = await get_or_404(session, Role, role_id, _ROLE)
     current = await repository.actions_of_role(session, role.id)
-    current_ids = {a.id for a in current}
+    current_ids = {action.id for action in current}
     requested = list(dict.fromkeys(data.action_ids))
     found = await repository.actions_by_id(session, requested)
     invalid = [
@@ -235,7 +245,7 @@ async def add_actions(
         )
     await session.flush()
     if new:
-        before_tags = sorted(a.tag for a in current)
+        before_tags = sorted(action.tag for action in current)
         after_tags = sorted({*before_tags, *(found[i].tag for i in new)})
         await audit.record_event(
             session,
@@ -254,10 +264,14 @@ async def remove_action(
     session: AsyncSession, role_id: UUID, action_id: UUID, actor: Actor
 ) -> RoleDetail:
     role = await get_or_404(session, Role, role_id, _ROLE)
-    before = [a.tag for a in await repository.actions_of_role(session, role.id)]
+    before = [
+        action.tag for action in await repository.actions_of_role(session, role.id)
+    ]
     if not await repository.remove_role_action(session, role.id, action_id):
         raise not_found("una acción asignada a este rol", action_id)
-    after = [a.tag for a in await repository.actions_of_role(session, role.id)]
+    after = [
+        action.tag for action in await repository.actions_of_role(session, role.id)
+    ]
     await audit.record_event(
         session,
         actor.entry(
@@ -314,7 +328,7 @@ async def _service_grants(
 
 
 def _service_labels(grants: list[ServiceGrantRead]) -> list[str]:
-    return sorted(f"{g.application.slug}:{g.role.slug}" for g in grants)
+    return sorted(f"{grant.application.slug}:{grant.role.slug}" for grant in grants)
 
 
 async def _caller_or_404(session: AsyncSession, app_id: UUID) -> None:
@@ -336,7 +350,7 @@ async def grant_service_access(
     nada; repetidos y ya concedidos se ignoran (idempotente)."""
     await _caller_or_404(session, app_id)
     before = await _service_grants(session, app_id)
-    granted = {g.role.id for g in before}
+    granted = {grant.role.id for grant in before}
     requested = list(dict.fromkeys(data.role_ids))
     found = await repository.roles_by_id(session, requested)
     missing = [str(i) for i in requested if i not in found]
@@ -345,7 +359,7 @@ async def grant_service_access(
             "Algunos roles no existen.", {"role_ids": missing}, code="invalid_reference"
         )
     new = [found[i] for i in requested if i not in granted]
-    same = [str(r.id) for r in new if r.application_id == app_id]
+    same = [str(role.id) for role in new if role.application_id == app_id]
     if same:
         raise ValidationAppError(
             "Una aplicación solo puede recibir roles de otra aplicación, no de sí "
@@ -353,12 +367,14 @@ async def grant_service_access(
             {"role_ids": same},
             code="same_application",
         )
-    apps = await repository.applications_by_id(session, {r.application_id for r in new})
+    apps = await repository.applications_by_id(
+        session, {role.application_id for role in new}
+    )
     leo_roles = [
-        str(r.id)
-        for r in new
-        if apps[r.application_id].slug == LEO_APP_SLUG
-        and r.slug not in LEO_SERVICE_GRANTABLE_ROLE_SLUGS
+        str(role.id)
+        for role in new
+        if apps[role.application_id].slug == LEO_APP_SLUG
+        and role.slug not in LEO_SERVICE_GRANTABLE_ROLE_SLUGS
     ]
     if leo_roles:
         raise ValidationAppError(
@@ -367,7 +383,7 @@ async def grant_service_access(
             {"role_ids": leo_roles},
             code="leo_app_not_grantable",
         )
-    inactive = [str(r.id) for r in new if not r.is_active]
+    inactive = [str(role.id) for role in new if not role.is_active]
     if inactive:
         raise ValidationAppError(
             "Algunos roles están desactivados. Actívalos antes de concederlos.",
@@ -408,7 +424,7 @@ async def revoke_service_access(
     audiencia, sus tokens de servicio vigentes se revocan en el acto."""
     await _caller_or_404(session, app_id)
     before = await _service_grants(session, app_id)
-    target = next((g for g in before if g.role.id == role_id), None)
+    target = next((grant for grant in before if grant.role.id == role_id), None)
     if target is None or not await repository.remove_service_grant(
         session, app_id, role_id
     ):

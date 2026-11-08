@@ -26,15 +26,15 @@ function route(over: Record<string, unknown> = {}) {
   const handlers: Record<string, unknown> = { 'GET /auth/sessions': () => page(sessions), 'GET /users': users, ...over }
   api.mockImplementation(async (url: string, opts: { method?: string } = {}) => {
     const key = `${opts.method ?? 'GET'} ${url.replace(/\/[^/]+\/revoke$/, '/{id}/revoke')}`
-    const h = handlers[key]
-    if (h === undefined) throw new Error(`sin handler: ${key}`)
-    if (h instanceof Error) throw h
-    return typeof h === 'function' ? h() : h
+    const handler = handlers[key]
+    if (handler === undefined) throw new Error(`sin handler: ${key}`)
+    if (handler instanceof Error) throw handler
+    return typeof handler === 'function' ? handler() : handler
   })
 }
 /** Filas del cuerpo de la tabla (sin la cabecera). */
-const bodyRows = (w: VueWrapper) => w.findAll('tr').slice(1)
-const sessionCalls = () => api.mock.calls.filter(c => c[0] === '/auth/sessions')
+const bodyRows = (wrapper: VueWrapper) => wrapper.findAll('tr').slice(1)
+const sessionCalls = () => api.mock.calls.filter(call => call[0] === '/auth/sessions')
 
 beforeEach(() => {
   api.mockReset()
@@ -73,7 +73,7 @@ describe('SessionsList', () => {
   it('estados: Activa, Inactiva por tiempo y Revocada con su motivo', async () => {
     const wrapper = await mountList()
     const statuses = wrapper.findAll('[data-testid="session-status"]')
-    expect(statuses.map(s => s.attributes('data-status'))).toEqual(['active', 'idle', 'revoked'])
+    expect(statuses.map(status => status.attributes('data-status'))).toEqual(['active', 'idle', 'revoked'])
     expect(statuses[0]!.text()).toBe('Activa')
     expect(statuses[1]!.text()).toBe('Inactiva por tiempo')
     expect(statuses[2]!.text()).toContain('Revocada')
@@ -95,12 +95,12 @@ describe('SessionsList', () => {
     signInWith(['leo.auth.view'])
     const wrapper = await mountList()
     expect(wrapper.find('[data-testid="session-revoke"]').exists()).toBe(false)
-    expect(wrapper.findAll('th').some(th => th.text() === 'Acciones')).toBe(false)
+    expect(wrapper.findAll('th').some(header => header.text() === 'Acciones')).toBe(false)
   })
 
   it('con leo.auth.revoke la columna «Acciones» existe', async () => {
     const wrapper = await mountList()
-    expect(wrapper.findAll('th').some(th => th.text() === 'Acciones')).toBe(true)
+    expect(wrapper.findAll('th').some(header => header.text() === 'Acciones')).toBe(true)
   })
 
   it('filtrar por usuario pide sus sesiones; «solo activas» desmarcado envía active_only=false', async () => {
@@ -125,7 +125,7 @@ describe('SessionsList', () => {
     await flushPromises()
     expect(document.body.textContent).toContain('Revocar sesión')
     expect(document.body.textContent).not.toContain('se cerrará tu sesión')
-    const confirmButton = [...document.body.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Revocar' && b.closest('[role="dialog"]'))!
+    const confirmButton = [...document.body.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Revocar' && button.closest('[role="dialog"]'))!
     confirmButton.click()
     await flushPromises()
     expect(api).toHaveBeenCalledWith('/auth/sessions/s9/revoke', { method: 'POST' })
@@ -146,7 +146,7 @@ describe('SessionsList', () => {
     const before = sessionCalls().length
     await wrapper.get('[data-testid="session-revoke"]').trigger('click')
     await flushPromises()
-    const confirmButton = [...document.body.querySelectorAll('button')].find(b => b.textContent?.includes('Cerrar mi sesión'))!
+    const confirmButton = [...document.body.querySelectorAll('button')].find(button => button.textContent?.includes('Cerrar mi sesión'))!
     confirmButton.click()
     await flushPromises()
     expect(document.body.textContent).toContain('No se encontró la sesión.')

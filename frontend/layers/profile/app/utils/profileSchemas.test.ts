@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { PasswordPolicy } from '#andromeda/utils/passwordPolicy'
 import { passwordChangeSchema, profileFormSchema, profileSchema } from './profileSchemas'
 
-type Parser = { safeParse: (v: unknown) => { success: boolean, error?: { issues: { path: (string | number)[], message: string }[] } } }
+type Parser = { safeParse: (value: unknown) => { success: boolean, error?: { issues: { path: (string | number)[], message: string }[] } } }
 
 const issues = (schema: Parser, input: unknown) => {
-  const r = schema.safeParse(input)
-  return r.success ? {} : Object.fromEntries(r.error!.issues.map(i => [i.path.join('.'), i.message])) as Record<string, string>
+  const result = schema.safeParse(input)
+  return result.success ? {} : Object.fromEntries(result.error!.issues.map(i => [i.path.join('.'), i.message])) as Record<string, string>
 }
 
 describe('profileSchema', () => {
@@ -45,10 +45,10 @@ describe('passwordChangeSchema', () => {
   })
 
   it('exige los tres campos', () => {
-    const r = issues(schema, { current_password: '', new_password: '', confirm_password: '' })
-    expect(r.current_password).toBeTruthy()
-    expect(r.new_password).toBeTruthy()
-    expect(r.confirm_password).toBeTruthy()
+    const result = issues(schema, { current_password: '', new_password: '', confirm_password: '' })
+    expect(result.current_password).toBeTruthy()
+    expect(result.new_password).toBeTruthy()
+    expect(result.confirm_password).toBeTruthy()
   })
 
   it('una contraseña débil dice qué falta', () => {
@@ -64,10 +64,10 @@ describe('passwordChangeSchema', () => {
   })
 
   it('puede contener el usuario o la parte local del correo (ya no está prohibido)', () => {
-    const r = issues(schema, { ...valid, new_password: 'Hola-ana.perez-2026', confirm_password: 'Hola-ana.perez-2026' })
-    expect(r.new_password).toBeUndefined()
-    const r2 = issues(schema, { ...valid, new_password: 'Hola-ANA-2026-x', confirm_password: 'Hola-ANA-2026-x' })
-    expect(r2.new_password).toBeUndefined()
+    const result = issues(schema, { ...valid, new_password: 'Hola-ana.perez-2026', confirm_password: 'Hola-ana.perez-2026' })
+    expect(result.new_password).toBeUndefined()
+    const secondResult = issues(schema, { ...valid, new_password: 'Hola-ANA-2026-x', confirm_password: 'Hola-ANA-2026-x' })
+    expect(secondResult.new_password).toBeUndefined()
   })
 
   it('debe ser distinta de la actual', () => {

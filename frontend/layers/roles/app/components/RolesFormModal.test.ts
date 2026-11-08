@@ -25,9 +25,9 @@ afterEach(() => { document.body.innerHTML = '' })
 const dialog = () => document.body.querySelector('[role="dialog"]')!
 const select = () => dialog().querySelector<HTMLSelectElement>('select')!
 const texts = () => [...dialog().querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea')]
-async function type(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
-  el.value = value
-  el.dispatchEvent(new Event(el instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }))
+async function type(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
+  element.value = value
+  element.dispatchEvent(new Event(element instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }))
   await flushPromises()
 }
 const submit = () => dialog().querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit', { cancelable: true }))
@@ -36,7 +36,7 @@ describe('RolesFormModal', () => {
   it('crear: solo ofrece aplicaciones activas y llama a POST /roles con el payload', async () => {
     api.mockResolvedValue(saved)
     const wrapper = await mountSuspended(RolesFormModal, { props: { open: true, applications }, attachTo: document.body })
-    expect([...select().options].map(o => o.textContent?.trim())).toEqual(['Elige una aplicación', 'Vladimir'])
+    expect([...select().options].map(option => option.textContent?.trim())).toEqual(['Elige una aplicación', 'Vladimir'])
     await type(select(), 'app1')
     await type(texts()[0]!, 'analista')
     await type(texts()[1]!, ' Analista ')
@@ -69,7 +69,7 @@ describe('RolesFormModal', () => {
     await type(texts()[1]!, 'Analista')
     submit()
     await vi.waitFor(() => expect(document.body.textContent).toContain('Ya existe un rol en esta aplicación'))
-    const alert = [...dialog().querySelectorAll('[role="alert"]')].find(a => a.textContent?.includes('Ya existe'))!
+    const alert = [...dialog().querySelectorAll('[role="alert"]')].find(alertElement => alertElement.textContent?.includes('Ya existe'))!
     expect(alert.closest('.flex.flex-col')?.textContent).toContain('Identificador')
   })
 

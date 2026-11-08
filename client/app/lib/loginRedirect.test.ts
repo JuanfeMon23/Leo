@@ -15,7 +15,7 @@ function setup(over: Partial<Parameters<typeof createLoginRedirector>[0]> = {}) 
   const store = new Map<string, string>()
   const guard = createLoginLoopGuard({
     now: () => 1,
-    storage: () => ({ getItem: k => store.get(k) ?? null, setItem: (k, v) => void store.set(k, v), removeItem: k => void store.delete(k) })
+    storage: () => ({ getItem: key => store.get(key) ?? null, setItem: (key, value) => void store.set(key, value), removeItem: key => void store.delete(key) })
   })
   const redirect = createLoginRedirector({ skip: () => false, currentPath: () => path, login, navigate, guard, onBlocked, onError, ...over })
   return { redirect, login, navigate, onBlocked, onError, guard }

@@ -58,7 +58,7 @@ describe('createLeoDirectTransport.request', () => {
     const { transport, calls } = await setup(() => json(200, {}))
     await transport.request('/auth/me')
     await transport.request('/auth/me')
-    const jtis = calls.map(c => decode(new Headers(c.init.headers).get('DPoP')!.split('.')[1]!).jti)
+    const jtis = calls.map(call => decode(new Headers(call.init.headers).get('DPoP')!.split('.')[1]!).jti)
     expect(new Set(jtis).size).toBe(2)
   })
 
@@ -75,7 +75,7 @@ describe('createLeoDirectTransport.request', () => {
 
   it('error del backend → LeoApiError con code y message', async () => {
     const { transport, onUnauthorized } = await setup(() => json(403, { code: 'forbidden', message: 'No tienes permiso para realizar esta acción.' }))
-    const err = await transport.request('/users').catch(e => e)
+    const err = await transport.request('/users').catch(error => error)
     expect(err).toBeInstanceOf(LeoApiError)
     expect(err).toMatchObject({ status: 403, code: 'forbidden' })
     expect(onUnauthorized).not.toHaveBeenCalled()

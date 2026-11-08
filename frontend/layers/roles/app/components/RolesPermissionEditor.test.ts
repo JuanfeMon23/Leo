@@ -78,7 +78,7 @@ describe('RolesPermissionEditor', () => {
     expect(events.text()).toContain('Eventos de auditoría (1)')
     expect(events.text()).toContain('Inicio de sesión')
     expect(events.find('input').exists()).toBe(false)
-    expect(wrapper.findAll('[data-testid="permission-row"]').some(r => r.text().includes('Inicio de sesión'))).toBe(false)
+    expect(wrapper.findAll('[data-testid="permission-row"]').some(result => result.text().includes('Inicio de sesión'))).toBe(false)
   })
 
   it('solo lectura: todo deshabilitado y sin «Seleccionar todo»', async () => {

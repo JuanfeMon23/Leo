@@ -12,7 +12,7 @@ export function userDisplayName(user: Partial<LeoUser> | null | undefined): stri
 export function userInitials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean)
   if (!words.length) return '?'
-  return words.slice(0, 2).map(w => Array.from(w)[0]!.toLocaleUpperCase('es')).join('')
+  return words.slice(0, 2).map(word => Array.from(word)[0]!.toLocaleUpperCase('es')).join('')
 }
 
 /** Inicial (una letra) del avatar de una app; `?` si no hay nombre. */

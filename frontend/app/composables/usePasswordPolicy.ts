@@ -16,10 +16,10 @@ export const DEFAULT_PASSWORD_POLICY: PasswordPolicy = {
 const BOOLEAN_KEYS = ['require_lowercase', 'require_uppercase', 'require_digit', 'require_symbol'] as const
 
 function isPasswordPolicy(value: unknown): value is PasswordPolicy {
-  const v = value as Record<string, unknown> | null
-  return !!v
-    && Number.isInteger(v.min_length) && Number.isInteger(v.max_length)
-    && BOOLEAN_KEYS.every(key => typeof v[key] === 'boolean')
+  const record = value as Record<string, unknown> | null
+  return !!record
+    && Number.isInteger(record.min_length) && Number.isInteger(record.max_length)
+    && BOOLEAN_KEYS.every(key => typeof record[key] === 'boolean')
 }
 
 let cached: { policy: PasswordPolicy, at: number } | null = null

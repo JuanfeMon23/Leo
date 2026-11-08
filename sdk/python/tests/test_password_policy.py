@@ -113,7 +113,7 @@ async def test_password_policy_leo_caido():
 
 async def test_password_policy_error_http():
     client = make_client(
-        lambda r: httpx.Response(429, json={}, headers={"retry-after": "5"})
+        lambda request: httpx.Response(429, json={}, headers={"retry-after": "5"})
     )
     with pytest.raises(TooManyAttemptsError):
         await client.password_policy()

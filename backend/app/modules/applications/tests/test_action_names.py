@@ -86,9 +86,9 @@ async def test_mismo_nombre_en_otro_modulo_es_valido(admin):
             f"{APPS}/{app['id']}/modules", json={"slug": "staff", "name": "Personal"}
         )
     ).json()
-    for m in (module, other):
+    for target_module in (module, other):
         response = await admin.post(
-            actions_url(app, m), json={"verb": "view", "name": "Consultar"}
+            actions_url(app, target_module), json={"verb": "view", "name": "Consultar"}
         )
         assert response.status_code == 201
 
@@ -156,7 +156,7 @@ async def test_nombres_en_detalle_de_rol(session, admin):
         json={"action_ids": [str(view.id), str(edit.id)]},
     )
     assert added.status_code == 200, added.text
-    by_tag = {a["tag"]: a for a in added.json()["actions"]}
+    by_tag = {action["tag"]: action for action in added.json()["actions"]}
     assert by_tag[f"{app.app.slug}.items.view"] == {
         "id": str(view.id),
         "tag": f"{app.app.slug}.items.view",
@@ -167,12 +167,14 @@ async def test_nombres_en_detalle_de_rol(session, admin):
         "module": {"id": str(view.module_id), "slug": "items", "name": "items"},
     }
     detail = (await admin.get(f"{ROLES}/{role.id}")).json()
-    assert {a["name"] for a in detail["actions"]} == {
+    assert {action["name"] for action in detail["actions"]} == {
         "Consultar items",
         "Editar items",
     }
     removed = await admin.delete(f"{ROLES}/{role.id}/actions/{edit.id}")
-    assert [a["name"] for a in removed.json()["actions"]] == ["Consultar items"]
+    assert [action["name"] for action in removed.json()["actions"]] == [
+        "Consultar items"
+    ]
 
 
 async def test_listado_de_acciones_asignables_trae_nombre_y_modulo(session, admin):

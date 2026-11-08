@@ -11,11 +11,11 @@ export interface ApplicationsQueryInput {
 
 /** Query de `GET /applications`: solo envía `q` y `active` cuando tienen valor. */
 export function buildApplicationsQuery(input: ApplicationsQueryInput) {
-  const q = normalizeSearchTerm(input.search)
+  const query = normalizeSearchTerm(input.search)
   return {
     page: input.page,
     page_size: APPLICATIONS_PAGE_SIZE,
-    ...(q ? { q } : {}),
+    ...(query ? { q: query } : {}),
     ...(input.active !== undefined ? { active: input.active } : {})
   }
 }

@@ -32,9 +32,13 @@ async def update_events(session):
 async def test_listado_agrupado_con_el_contrato_completo(admin):
     response = await admin.get(SETTINGS)
     assert response.status_code == 200, response.text
-    groups = {g["group"]: g["settings"] for g in response.json()["groups"]}
+    groups = {group["group"]: group["settings"] for group in response.json()["groups"]}
     assert set(groups) == {"audit", "auth", "pagination", "password", "rate_limit"}
-    idle = next(s for s in groups["auth"] if s["key"] == "auth.idle_timeout_minutes")
+    idle = next(
+        setting
+        for setting in groups["auth"]
+        if setting["key"] == "auth.idle_timeout_minutes"
+    )
     assert idle == {
         **idle,
         "type": "int",
@@ -48,7 +52,9 @@ async def test_listado_agrupado_con_el_contrato_completo(admin):
     }
     assert idle["description"]
     lock = next(
-        s for s in groups["auth"] if s["key"] == "auth.login_max_failed_attempts"
+        setting
+        for setting in groups["auth"]
+        if setting["key"] == "auth.login_max_failed_attempts"
     )
     assert lock["requires_security_permission"] is True
 
@@ -87,8 +93,10 @@ async def test_edit_cambia_valor_audita_y_deja_historial(session, make_browser):
     assert history["items"][0]["old_value"] == 30
     assert history["items"][0]["changed_by_username"] == nav.user.username
     listed = (await nav.get(SETTINGS)).json()["groups"]
-    auth = next(g for g in listed if g["group"] == "auth")["settings"]
-    idle = next(s for s in auth if s["key"] == "auth.idle_timeout_minutes")
+    auth = next(group for group in listed if group["group"] == "auth")["settings"]
+    idle = next(
+        setting for setting in auth if setting["key"] == "auth.idle_timeout_minutes"
+    )
     assert idle["value"] == 45
 
 

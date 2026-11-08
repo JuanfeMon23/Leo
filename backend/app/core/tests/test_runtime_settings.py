@@ -111,15 +111,23 @@ EXPECTED = {
 def test_registro_con_las_claves_rangos_y_grupos_acordados():
     assert set(LEO_SETTINGS.keys()) == set(EXPECTED)
     for key, expected in EXPECTED.items():
-        d = LEO_SETTINGS.get(key)
-        got = (d.type, d.default, d.min, d.max, d.unit, d.group, d.requires_security)
+        definition = LEO_SETTINGS.get(key)
+        got = (
+            definition.type,
+            definition.default,
+            definition.min,
+            definition.max,
+            definition.unit,
+            definition.group,
+            definition.requires_security,
+        )
         assert got == expected, key
-        assert d.description
+        assert definition.description
 
 
 def test_cada_variable_heredada_apunta_a_claves_del_registro():
     for keys in LEGACY_POLICY_ENV.values():
-        assert all(k in LEO_SETTINGS for k in keys)
+        assert all(key in LEO_SETTINGS for key in keys)
     # LEO_LOGIN_RATE_LIMIT_PER_MINUTE alimentaba 5 limites: ahora son 5 claves.
     assert len(LEGACY_POLICY_ENV["LEO_LOGIN_RATE_LIMIT_PER_MINUTE"]) == 5
 

@@ -137,7 +137,7 @@ async def test_service_401_renews_token_and_retries_once(parts) -> None:
     out = await client.update_user_profile("t", first_name="A")
     assert out.first_name == "A"
     assert leo.issued == 2
-    assert [c[3] for c in leo.calls] == ["Bearer svc-1", "Bearer svc-2"]
+    assert [call[3] for call in leo.calls] == ["Bearer svc-1", "Bearer svc-2"]
 
 
 async def test_user_token_401_is_not_retried(parts) -> None:
@@ -167,8 +167,12 @@ async def test_persistent_service_401_gives_up_after_one_retry(parts) -> None:
             leo.issued += 1
             return httpx.Response(
                 200,
-                json={"access_token": f"x{leo.issued}", "token_type": "Bearer",
-                      "expires_in": 600, "audience": "leo"},
+                json={
+                    "access_token": f"x{leo.issued}",
+                    "token_type": "Bearer",
+                    "expires_in": 600,
+                    "audience": "leo",
+                },
             )
         return httpx.Response(401, json={"code": "invalid_token", "message": "m"})
 
@@ -215,7 +219,11 @@ async def test_429_carries_retry_after(parts) -> None:
 async def test_invalid_credentials_401_is_not_retried(parts) -> None:
     client, leo = parts
     leo.override[PASSWORD] = httpx.Response(
-        401, json={"code": "invalid_credentials", "message": "La contraseña actual no es correcta."}
+        401,
+        json={
+            "code": "invalid_credentials",
+            "message": "La contraseña actual no es correcta.",
+        },
     )
     with pytest.raises(LeoError) as exc:
         await client.change_user_password("t", "mala", "nueva")

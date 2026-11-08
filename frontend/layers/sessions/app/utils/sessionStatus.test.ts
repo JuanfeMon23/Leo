@@ -32,13 +32,13 @@ describe('sessionStatus', () => {
   })
 
   it('inactiva por tiempo: venció sin revocarse', () => {
-    const s = session({ expires_at: new Date(2026, 9, 19, 9, 59).toISOString() })
-    expect(sessionStatus(s, NOW)).toEqual({ kind: 'idle', label: 'Inactiva por tiempo', reason: null })
+    const sessionData = session({ expires_at: new Date(2026, 9, 19, 9, 59).toISOString() })
+    expect(sessionStatus(sessionData, NOW)).toEqual({ kind: 'idle', label: 'Inactiva por tiempo', reason: null })
   })
 
   it('revocada con su motivo legible (manda sobre el vencimiento)', () => {
-    const s = session({ revoked_at: new Date(2026, 9, 19, 9, 0).toISOString(), revoked_reason: 'admin', expires_at: new Date(2026, 9, 19, 9, 30).toISOString() })
-    expect(sessionStatus(s, NOW)).toEqual({ kind: 'revoked', label: 'Revocada', reason: 'Revocada por un administrador' })
+    const sessionData = session({ revoked_at: new Date(2026, 9, 19, 9, 0).toISOString(), revoked_reason: 'admin', expires_at: new Date(2026, 9, 19, 9, 30).toISOString() })
+    expect(sessionStatus(sessionData, NOW)).toEqual({ kind: 'revoked', label: 'Revocada', reason: 'Revocada por un administrador' })
   })
 })
 

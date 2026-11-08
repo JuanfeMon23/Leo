@@ -27,8 +27,8 @@ function inputs() {
 }
 async function fill(values: string[]) {
   const els = inputs()
-  for (const [i, v] of values.entries()) {
-    els[i]!.value = v
+  for (const [i, value] of values.entries()) {
+    els[i]!.value = value
     els[i]!.dispatchEvent(new Event('input', { bubbles: true }))
   }
   await flushPromises()

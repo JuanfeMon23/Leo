@@ -151,10 +151,13 @@ def test_pkce_challenge_is_s256() -> None:
 
 
 def test_new_flow_generates_unique_values() -> None:
-    a, b = new_flow(jkt="J" * 43), new_flow(jkt="J" * 43)
-    assert a.state != b.state and a.code_verifier != b.code_verifier
-    assert len(a.code_verifier) >= 43
-    assert a.code_challenge == pkce_challenge(a.code_verifier)
+    first_flow, second_flow = new_flow(jkt="J" * 43), new_flow(jkt="J" * 43)
+    assert (
+        first_flow.state != second_flow.state
+        and first_flow.code_verifier != second_flow.code_verifier
+    )
+    assert len(first_flow.code_verifier) >= 43
+    assert first_flow.code_challenge == pkce_challenge(first_flow.code_verifier)
 
 
 def test_flow_cookie_roundtrip() -> None:

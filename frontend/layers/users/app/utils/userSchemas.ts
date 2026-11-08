@@ -21,18 +21,18 @@ export const USERS_DOCUMENT_LABELS: Record<typeof USERS_DOCUMENT_TYPES[number], 
 }
 
 const zUsername = z.preprocess(
-  v => (typeof v === 'string' ? v.trim().toLowerCase() : v),
+  value => (typeof value === 'string' ? value.trim().toLowerCase() : value),
   z.string({ required_error: 'El usuario es obligatorio.' })
     .min(1, 'El usuario es obligatorio.')
-    .superRefine((v, ctx) => {
-      if (v.includes('@')) ctx.addIssue({ code: 'custom', message: 'El usuario no puede contener «@».' })
-      else if (v.length < 3 || v.length > 64) ctx.addIssue({ code: 'custom', message: 'Debe tener entre 3 y 64 caracteres.' })
-      else if (!USERS_USERNAME_REGEX.test(v)) ctx.addIssue({ code: 'custom', message: 'Usa minúsculas, números y . _ - (sin empezar ni terminar con símbolo).' })
+    .superRefine((value, ctx) => {
+      if (value.includes('@')) ctx.addIssue({ code: 'custom', message: 'El usuario no puede contener «@».' })
+      else if (value.length < 3 || value.length > 64) ctx.addIssue({ code: 'custom', message: 'Debe tener entre 3 y 64 caracteres.' })
+      else if (!USERS_USERNAME_REGEX.test(value)) ctx.addIssue({ code: 'custom', message: 'Usa minúsculas, números y . _ - (sin empezar ni terminar con símbolo).' })
     })
 )
 
 const zDocumentNumber = z.preprocess(
-  v => (typeof v === 'string' ? v.trim().toUpperCase() : v),
+  value => (typeof value === 'string' ? value.trim().toUpperCase() : value),
   z.string({ required_error: 'El número de documento es obligatorio.' })
     .min(1, 'El número de documento es obligatorio.')
     .max(32, 'Máximo 32 caracteres.')

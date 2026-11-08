@@ -26,15 +26,15 @@ export interface PermissionContract {
 
 export const PERMISSION_CONTRACT: PermissionContract = contractJson
 
-export const CONTRACT_ACTIONS: ContractAction[] = PERMISSION_CONTRACT.modules.flatMap(m => m.actions)
+export const CONTRACT_ACTIONS: ContractAction[] = PERMISSION_CONTRACT.modules.flatMap(module => module.actions)
 
 /** tag -> nombre legible, solo de las acciones asignables (los eventos no son permisos). */
 export const PERMISSION_NAMES: Record<string, string> = Object.fromEntries(
-  CONTRACT_ACTIONS.filter(a => a.assignable).map(a => [a.tag, a.name])
+  CONTRACT_ACTIONS.filter(contractAction => contractAction.assignable).map(contractAction => [contractAction.tag, contractAction.name])
 )
 
 /** Tags asignables de un módulo (`users`, `auth`…). */
 export function assignableTagsOf(moduleSlug: string): string[] {
-  const mod = PERMISSION_CONTRACT.modules.find(m => m.slug === moduleSlug)
-  return mod ? mod.actions.filter(a => a.assignable).map(a => a.tag) : []
+  const mod = PERMISSION_CONTRACT.modules.find(module => module.slug === moduleSlug)
+  return mod ? mod.actions.filter(action => action.assignable).map(action => action.tag) : []
 }

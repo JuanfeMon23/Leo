@@ -9,7 +9,7 @@ const json = (status: number, body: unknown) =>
 describe('createForbiddenHandler', () => {
   it('refresca una vez; 403 durante el refresco no encadenan otro', async () => {
     let done!: () => void
-    const refresh = vi.fn(() => new Promise<void>((r) => { done = r }))
+    const refresh = vi.fn(() => new Promise<void>((result) => { done = result }))
     const handle = createForbiddenHandler({ refresh, goToForbiddenPage: vi.fn() })
     handle('refresh')
     handle('refresh')
@@ -26,7 +26,7 @@ describe('createForbiddenHandler', () => {
     const refresh = vi.fn(async () => { throw new Error('red') })
     const handle = createForbiddenHandler({ refresh, goToForbiddenPage: vi.fn() })
     handle('refresh')
-    await new Promise(r => setTimeout(r))
+    await new Promise(result => setTimeout(result))
     handle('refresh')
     expect(refresh).toHaveBeenCalledTimes(2)
   })
@@ -59,7 +59,7 @@ describe('transporte: onForbidden', () => {
     const { transport, onForbidden } = await setup(() => json(403, { code: 'forbidden', message: 'x' }))
     await transport.request('/a').catch(() => {})
     await transport.request('/a', { onForbidden: 'forbidden-page' }).catch(() => {})
-    expect(onForbidden.mock.calls.map(c => c[1])).toEqual(['refresh', 'forbidden-page'])
+    expect(onForbidden.mock.calls.map(call => call[1])).toEqual(['refresh', 'forbidden-page'])
   })
 
   it('403 con otro code (regla de negocio) no refresca', async () => {

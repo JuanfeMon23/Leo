@@ -23,10 +23,10 @@ const SYSTEMS: ReadonlyArray<readonly [string, RegExp]> = [
  * «Desconocido».
  */
 export function summarizeUserAgent(userAgent: string | null | undefined): string {
-  const ua = userAgent?.trim()
-  if (!ua) return 'Desconocido'
-  const browser = BROWSERS.map(([name, re]) => [name, re.exec(ua)?.[1]] as const).find(([, v]) => v)
-  if (!browser) return ua.length > MAX_UNKNOWN ? `${ua.slice(0, MAX_UNKNOWN - 1)}…` : ua
-  const system = SYSTEMS.find(([, re]) => re.test(ua))?.[0]
+  const trimmedAgent = userAgent?.trim()
+  if (!trimmedAgent) return 'Desconocido'
+  const browser = BROWSERS.map(([name, pattern]) => [name, pattern.exec(trimmedAgent)?.[1]] as const).find(([, version]) => version)
+  if (!browser) return trimmedAgent.length > MAX_UNKNOWN ? `${trimmedAgent.slice(0, MAX_UNKNOWN - 1)}…` : trimmedAgent
+  const system = SYSTEMS.find(([, pattern]) => pattern.test(trimmedAgent))?.[0]
   return system ? `${browser[0]} ${browser[1]} en ${system}` : `${browser[0]} ${browser[1]}`
 }

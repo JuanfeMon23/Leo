@@ -120,8 +120,8 @@ async def session(engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
             expire_on_commit=False,
             join_transaction_mode="create_savepoint",
         )
-        async with maker() as s:
-            yield s
+        async with maker() as db_session:
+            yield db_session
         await outer.rollback()
 
 
@@ -186,9 +186,11 @@ def clock() -> Clock:
 
 @pytest_asyncio.fixture
 async def store(registry, shared_factory, clock) -> SettingsStore:
-    s = SettingsStore(registry, shared_factory, MODELS, cache_ttl=10, monotonic=clock)
-    await s.sync_registry()
-    return s
+    store = SettingsStore(
+        registry, shared_factory, MODELS, cache_ttl=10, monotonic=clock
+    )
+    await store.sync_registry()
+    return store
 
 
 @pytest_asyncio.fixture

@@ -10,14 +10,14 @@ beforeEach(() => signInWith([])) // sin ningún tag: es autogestión
 
 describe('página /profile', () => {
   it('«Mi perfil» se muestra a quien solo tiene sesión (sin tags)', async () => {
-    const w = await mountSuspended(ProfilePage)
-    expect(w.text()).toContain('Mi perfil')
-    expect(w.find('[data-testid="profile-form"]').exists()).toBe(true)
-    expect(w.find('[data-testid="password-form"]').exists()).toBe(true)
+    const wrapper = await mountSuspended(ProfilePage)
+    expect(wrapper.text()).toContain('Mi perfil')
+    expect(wrapper.find('[data-testid="profile-form"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="password-form"]').exists()).toBe(true)
   })
 
   it('sin ?return= válido no hay enlace de vuelta', async () => {
-    const w = await mountSuspended(ProfilePage)
-    expect(w.find('[data-testid="profile-return"]').exists()).toBe(false)
+    const wrapper = await mountSuspended(ProfilePage)
+    expect(wrapper.find('[data-testid="profile-return"]').exists()).toBe(false)
   })
 })

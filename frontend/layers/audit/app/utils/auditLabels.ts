@@ -31,13 +31,13 @@ export const auditApplicationName = (catalog: AuditCatalog, applicationId: strin
 /** Nombre del módulo; sin catálogo, su slug; sin módulo, «—». */
 export function auditModuleName(catalog: AuditCatalog, applicationId: string, slug: string | null): string {
   if (!slug) return '—'
-  return catalog[applicationId]?.modules.find(m => m.slug === slug)?.name ?? slug
+  return catalog[applicationId]?.modules.find(module => module.slug === slug)?.name ?? slug
 }
 
 /** Nombre legible de la acción; sin catálogo, el tag técnico. */
 export function auditActionName(catalog: AuditCatalog, applicationId: string, tag: string): string {
   for (const mod of catalog[applicationId]?.modules ?? []) {
-    const found = mod.actions.find(a => a.tag === tag)
+    const found = mod.actions.find(action => action.tag === tag)
     if (found) return found.name
   }
   return tag

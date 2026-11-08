@@ -44,27 +44,41 @@ async def test_sync_inserts_defaults_and_initial_values(
 ):
     store = SettingsStore(registry, shared_factory, MODELS, monotonic=clock)
     result = await store.sync_registry({"auth.idle_minutes": 45, "ui.ratio": 99})
-    assert sorted(result.inserted) == sorted(d.key for d in REGISTRY_DEFS)
+    assert sorted(result.inserted) == sorted(
+        definition.key for definition in REGISTRY_DEFS
+    )
     assert (await row(session, "auth.idle_minutes")).value == 45
     # Valor inicial fuera de rango: se ignora y queda el default.
     assert (await row(session, "ui.ratio")).value == 1.5
-    r = await row(session, "auth.max_attempts")
-    assert (r.value, r.version, r.min_value, r.max_value, r.unit) == (
+    setting_row = await row(session, "auth.max_attempts")
+    assert (
+        setting_row.value,
+        setting_row.version,
+        setting_row.min_value,
+        setting_row.max_value,
+        setting_row.unit,
+    ) == (
         5,
         1,
         3,
         20,
         "count",
     )
-    assert r.requires_security_permission is True and r.group_name == "auth"
+    assert (
+        setting_row.requires_security_permission is True
+        and setting_row.group_name == "auth"
+    )
 
 
 async def test_sync_is_idempotent_and_keeps_values(store, session):
     await store.update("auth.idle_minutes", 60, "porque sí", ACTOR, 1)
     again = await store.sync_registry({"auth.idle_minutes": 10})
     assert again.inserted == [] and again.updated == [] and again.adjusted == []
-    r = await row(session, "auth.idle_minutes")
-    assert (r.value, r.version) == (60, 2)  # el initial_value no pisa el vigente
+    setting_row = await row(session, "auth.idle_minutes")
+    assert (setting_row.value, setting_row.version) == (
+        60,
+        2,
+    )  # el initial_value no pisa el vigente
 
 
 async def test_sync_updates_metadata_without_touching_value(
@@ -89,10 +103,18 @@ async def test_sync_updates_metadata_without_touching_value(
     other = SettingsStore(new, shared_factory, MODELS)
     result = await other.sync_registry()
     assert result.updated == ["auth.idle_minutes"] and result.adjusted == []
-    r = await row(session, "auth.idle_minutes")
-    assert r.value == 60 and r.version == 2
-    assert (r.min_value, r.max_value, r.default_value) == (10, 240, 20)
-    assert (r.description, r.group_name, r.requires_security_permission) == (
+    setting_row = await row(session, "auth.idle_minutes")
+    assert setting_row.value == 60 and setting_row.version == 2
+    assert (
+        setting_row.min_value,
+        setting_row.max_value,
+        setting_row.default_value,
+    ) == (10, 240, 20)
+    assert (
+        setting_row.description,
+        setting_row.group_name,
+        setting_row.requires_security_permission,
+    ) == (
         "Nueva descripción.",
         "seguridad",
         True,
@@ -126,10 +148,11 @@ async def test_sync_clamps_value_outside_new_range_and_logs_history(
     )
     result = await other.sync_registry()
     assert result.adjusted == ["auth.idle_minutes"]
-    r = await row(session, "auth.idle_minutes")
-    assert r.value == expected and r.version == 3
+    setting_row = await row(session, "auth.idle_minutes")
+    assert setting_row.value == expected and setting_row.version == 3
     last = max(
-        await history_rows(session, "auth.idle_minutes"), key=lambda h: h.version_after
+        await history_rows(session, "auth.idle_minutes"),
+        key=lambda entry: entry.version_after,
     )
     assert (last.old_value, last.new_value, last.version_after) == (stored, expected, 3)
     assert last.changed_by is None and last.changed_by_username == "system"
@@ -154,21 +177,26 @@ async def test_update_writes_setting_and_history(store, session, user_id):
     change = await store.update("auth.idle_minutes", 45, "  Política nueva ", actor, 1)
     assert (change.before, change.after, change.reason) == (30, 45, "Política nueva")
     assert change.view.version == 2 and change.view.value == 45
-    r = await row(session, "auth.idle_minutes")
-    assert (r.value, r.version, r.updated_by, r.updated_by_username) == (
+    setting_row = await row(session, "auth.idle_minutes")
+    assert (
+        setting_row.value,
+        setting_row.version,
+        setting_row.updated_by,
+        setting_row.updated_by_username,
+    ) == (
         45,
         2,
         user_id,
         "ana",
     )
-    [h] = await history_rows(session, "auth.idle_minutes")
-    assert (h.old_value, h.new_value, h.version_after, h.reason) == (
+    [entry] = await history_rows(session, "auth.idle_minutes")
+    assert (entry.old_value, entry.new_value, entry.version_after, entry.reason) == (
         30,
         45,
         2,
         "Política nueva",
     )
-    assert (h.changed_by, h.changed_by_username, h.request_id) == (
+    assert (entry.changed_by, entry.changed_by_username, entry.request_id) == (
         user_id,
         "ana",
         "req-9",
@@ -267,16 +295,16 @@ async def test_history_pages_newest_first(store):
             "auth.idle_minutes", value, f"cambio {value}", ACTOR, version
         )
     page1 = await store.history("auth.idle_minutes", page=1, page_size=2)
-    assert page1.total == 3 and [h.new_value for h in page1.items] == [12, 11]
+    assert page1.total == 3 and [entry.new_value for entry in page1.items] == [12, 11]
     page2 = await store.history("auth.idle_minutes", page=2, page_size=2)
-    assert [h.new_value for h in page2.items] == [10]
+    assert [entry.new_value for entry in page2.items] == [10]
     assert (await store.history("ui.title")).total == 0
 
 
 async def test_list_groups_alphabetically(store):
     grouped = await store.list()
     assert list(grouped) == ["auth", "ui"]
-    assert [v.key for v in grouped["auth"]] == [
+    assert [view.key for view in grouped["auth"]] == [
         "auth.idle_minutes",
         "auth.max_attempts",
     ]

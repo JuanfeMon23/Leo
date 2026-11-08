@@ -20,7 +20,10 @@ def make_request(
             "type": "http",
             "method": "GET",
             "path": "/",
-            "headers": [(k.lower().encode(), v.encode()) for k, v in items],
+            "headers": [
+                (header_name.lower().encode(), header_value.encode())
+                for header_name, header_value in items
+            ],
             "client": (peer, 5000) if peer else None,
         }
     )

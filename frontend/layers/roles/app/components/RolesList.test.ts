@@ -88,7 +88,7 @@ describe('RolesList', () => {
     const wrapper = await mountList()
     await wrapper.get('[data-testid="role-toggle"]').trigger('click')
     expect(document.body.textContent).toContain('Se desactivará «Analista»')
-    const confirm = [...document.body.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Desactivar' && b.closest('[role="dialog"]'))!
+    const confirm = [...document.body.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Desactivar' && button.closest('[role="dialog"]'))!
     confirm.click()
     await flushPromises()
     expect(api).toHaveBeenCalledWith('/roles/r1/deactivate', { method: 'POST' })

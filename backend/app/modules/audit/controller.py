@@ -159,10 +159,10 @@ async def export_csv(session: AsyncSession, filters: AuditFilters, actor: Actor)
     writer.writerow(EXPORT_COLUMNS)
     for event, app_slug in rows:
         values = {
-            **{c: getattr(event, c, None) for c in EXPORT_COLUMNS},
+            **{column: getattr(event, column, None) for column in EXPORT_COLUMNS},
             "application": app_slug,
         }
-        writer.writerow([_csv_cell(values[c]) for c in EXPORT_COLUMNS])
+        writer.writerow([_csv_cell(values[column]) for column in EXPORT_COLUMNS])
     await record_event(
         session,
         actor.entry(
@@ -172,7 +172,11 @@ async def export_csv(session: AsyncSession, filters: AuditFilters, actor: Actor)
             changes={
                 "filters": {
                     "before": None,
-                    "after": {k: v for k, v in vars(filters).items() if v is not None},
+                    "after": {
+                        key: value
+                        for key, value in vars(filters).items()
+                        if value is not None
+                    },
                 }
             },
         ),
@@ -234,7 +238,9 @@ async def ingest_event(
             entity_type=data.entity_type,
             entity_id=data.entity_id,
             changes={
-                k: v for k, v in (data.changes or {}).items() if not is_sensitive(k)
+                key: value
+                for key, value in (data.changes or {}).items()
+                if not is_sensitive(key)
             }
             or None,
             reason=data.reason,

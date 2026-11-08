@@ -55,7 +55,7 @@ class FakeLeo:
         self.extra_user: dict[str, Any] = {}
 
     def count(self, path: str) -> int:
-        return sum(1 for _, p in self.calls if p == path)
+        return sum(1 for _, called_path in self.calls if called_path == path)
 
     def issue(self, jkt: str) -> dict[str, Any]:
         access, refresh = f"acc-{uuid4().hex}", f"ref-{uuid4().hex}"
@@ -236,9 +236,9 @@ def app(auth: LeoAuth) -> FastAPI:
 
 @pytest_asyncio.fixture
 async def browser(app: FastAPI) -> AsyncGenerator[Browser]:
-    b = Browser(app)
-    yield b
-    await b.http.aclose()
+    browser = Browser(app)
+    yield browser
+    await browser.http.aclose()
 
 
 # --- settings / cliente ---
@@ -253,16 +253,16 @@ def test_settings_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "PUBLIC_URL": "https://a.x",
     }.items():
         monkeypatch.setenv(key, value)
-    s = LeoSettings()
-    assert s.app_client_secret.get_secret_value() == "s3"
-    assert "s3" not in repr(s)
-    assert s.callback_url == "https://a.x/auth/callback"
-    assert s.cookie_name("leo_access") == "__Host-leo_access"
+    leo_settings = LeoSettings()
+    assert leo_settings.app_client_secret.get_secret_value() == "s3"
+    assert "s3" not in repr(leo_settings)
+    assert leo_settings.callback_url == "https://a.x/auth/callback"
+    assert leo_settings.cookie_name("leo_access") == "__Host-leo_access"
 
 
 def test_cookie_names_without_secure(settings: LeoSettings) -> None:
-    s = settings.model_copy(update={"cookie_secure": False})
-    assert s.cookie_name("leo_access") == "leo_access"
+    leo_settings = settings.model_copy(update={"cookie_secure": False})
+    assert leo_settings.cookie_name("leo_access") == "leo_access"
 
 
 async def test_client_sends_basic_auth_and_maps_errors(
@@ -542,7 +542,7 @@ async def test_concurrent_requests_refresh_once(
     responses = await asyncio.gather(
         *(browser.call("GET", "/auth/me") for _ in range(4))
     )
-    assert [r.status_code for r in responses] == [200] * 4
+    assert [response.status_code for response in responses] == [200] * 4
     assert leo.count("/auth/token") == 1
 
 
@@ -734,7 +734,7 @@ async def test_audit_network_failure_queues_and_retries(
     leo.down = False
     assert await audit.record("app.things.view") is True
     assert audit.pending == 0
-    assert [e["action_tag"] for e in leo.events] == [
+    assert [event["action_tag"] for event in leo.events] == [
         "app.things.edit",
         "app.things.view",
     ]

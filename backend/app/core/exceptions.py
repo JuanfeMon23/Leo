@@ -188,7 +188,7 @@ def _field_message(error: dict[str, Any]) -> str:
     template = _PYDANTIC_MESSAGES.get(error.get("type", ""))
     if template is None:
         return error.get("msg", "Valor inválido.")
-    ctx = {k: str(v) for k, v in (error.get("ctx") or {}).items()}
+    ctx = {key: str(value) for key, value in (error.get("ctx") or {}).items()}
     try:
         return template.format(**ctx)
     except KeyError:
@@ -198,7 +198,11 @@ def _field_message(error: dict[str, Any]) -> str:
 def _validation_handler(_request: Request, exc: RequestValidationError) -> JSONResponse:
     details = []
     for error in exc.errors():
-        loc = [str(p) for p in error.get("loc", ()) if p not in ("body",)]
+        loc = [
+            str(location_part)
+            for location_part in error.get("loc", ())
+            if location_part not in ("body",)
+        ]
         details.append({"field": ".".join(loc), "message": _field_message(error)})
     first = details[0] if details else None
     summary = "Hay datos inválidos en la solicitud."

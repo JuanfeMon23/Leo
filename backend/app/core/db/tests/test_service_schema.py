@@ -139,8 +139,8 @@ async def test_token_de_servicio_valido_no_lleva_sesion_ni_usuario(
 ) -> None:
     await conn.execute(text(INSERT_TOKEN), _token(ctx))
     columns = {
-        r[0]
-        for r in await conn.execute(
+        row[0]
+        for row in await conn.execute(
             text(
                 "SELECT column_name FROM information_schema.columns "
                 "WHERE table_name = 'service_tokens'"
@@ -253,10 +253,15 @@ async def test_indices_de_service_tokens_y_service_grants(
         )
     )
     defs = {name: definition for name, definition in rows}
-    assert any("UNIQUE" in d and "(token_hash)" in d for d in defs.values()), defs
     assert any(
-        "(caller_application_id, audience_application_id)" in d for d in defs.values()
+        "UNIQUE" in definition and "(token_hash)" in definition
+        for definition in defs.values()
     ), defs
     assert any(
-        "UNIQUE" in d and "(caller_application_id, role_id)" in d for d in defs.values()
+        "(caller_application_id, audience_application_id)" in definition
+        for definition in defs.values()
+    ), defs
+    assert any(
+        "UNIQUE" in definition and "(caller_application_id, role_id)" in definition
+        for definition in defs.values()
     ), defs

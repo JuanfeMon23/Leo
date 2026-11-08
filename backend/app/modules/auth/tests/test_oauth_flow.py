@@ -510,10 +510,10 @@ async def test_permisos_en_vivo_al_desactivar_una_accion(flow: Flow, admin, sess
     tokens = await flow.tokens()
     detail = (await admin.get(f"/api/v1/applications/{flow.app.app.id}")).json()
     action = next(
-        a
-        for m in detail["modules"]
-        for a in m["actions"]
-        if a["tag"] == "vlad.items.view"
+        application
+        for module in detail["modules"]
+        for application in module["actions"]
+        if application["tag"] == "vlad.items.view"
     )
     url = f"/api/v1/applications/{flow.app.app.id}/actions/{action['id']}/deactivate"
     assert (await admin.post(url)).status_code == 200
@@ -580,8 +580,14 @@ async def test_introspect_applications_solo_las_apps_con_acceso(flow: Flow, sess
 
     info = await flow.introspect((await flow.tokens())["access_token"])
 
-    assert sorted(a["slug"] for a in info["applications"]) == ["incu", "vlad"]
-    assert all(set(a) == {"slug", "name", "base_url"} for a in info["applications"])
+    assert sorted(application["slug"] for application in info["applications"]) == [
+        "incu",
+        "vlad",
+    ]
+    assert all(
+        set(application) == {"slug", "name", "base_url"}
+        for application in info["applications"]
+    )
 
 
 async def test_introspect_inactivo_no_trae_los_campos_nuevos(flow: Flow):

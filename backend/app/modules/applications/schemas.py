@@ -177,11 +177,11 @@ class CatalogSync(BaseModel):
 
     @model_validator(mode="after")
     def _unique_slugs_and_verbs(self) -> "CatalogSync":
-        slugs = [m.slug for m in self.modules]
+        slugs = [module_entry.slug for module_entry in self.modules]
         if len(slugs) != len(set(slugs)):
             raise ValueError("Hay módulos repetidos en el catálogo.")
         for module in self.modules:
-            verbs = [a.verb for a in module.actions]
+            verbs = [action.verb for action in module.actions]
             if len(verbs) != len(set(verbs)):
                 raise ValueError(
                     f"Hay acciones repetidas en el módulo «{module.slug}»."

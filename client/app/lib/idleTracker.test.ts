@@ -8,14 +8,14 @@ const WARN = 60_000
 
 /** Canal en memoria que imita BroadcastChannel: entrega a las demás pestañas, no a sí misma. */
 function channelHub() {
-  const members = new Set<{ deliver: (m: IdleMessage) => void }>()
+  const members = new Set<{ deliver: (message: IdleMessage) => void }>()
   return () => {
-    let listener: ((m: IdleMessage) => void) | null = null
-    const member = { deliver: (m: IdleMessage) => listener?.(m) }
+    let listener: ((message: IdleMessage) => void) | null = null
+    const member = { deliver: (message: IdleMessage) => listener?.(message) }
     members.add(member)
     const channel: IdleChannel = {
-      post: (m) => { for (const other of members) if (other !== member) other.deliver(m) },
-      subscribe: (cb) => { listener = cb; return () => { listener = null } },
+      post: (message) => { for (const other of members) if (other !== member) other.deliver(message) },
+      subscribe: (callback) => { listener = callback; return () => { listener = null } },
       close: () => { members.delete(member) }
     }
     return channel
@@ -145,88 +145,88 @@ describe('createIdleTracker', () => {
 describe('sincronización entre pestañas', () => {
   it('la actividad en una pestaña mantiene viva la sesión en las otras', () => {
     const open = channelHub()
-    const a = setup({ channel: open() })
-    const b = setup({ channel: open() })
-    a.tracker.start()
-    b.tracker.start()
+    const firstTab = setup({ channel: open() })
+    const secondTab = setup({ channel: open() })
+    firstTab.tracker.start()
+    secondTab.tracker.start()
 
     vi.advanceTimersByTime(25 * MIN)
-    a.tracker.activity()
+    firstTab.tracker.activity()
     vi.advanceTimersByTime(25 * MIN)
 
-    expect(a.onExpire).not.toHaveBeenCalled()
-    expect(b.onExpire).not.toHaveBeenCalled()
-    expect(b.onWarn).not.toHaveBeenCalled()
+    expect(firstTab.onExpire).not.toHaveBeenCalled()
+    expect(secondTab.onExpire).not.toHaveBeenCalled()
+    expect(secondTab.onWarn).not.toHaveBeenCalled()
   })
 
   it('la actividad en otra pestaña cierra el aviso de esta', () => {
     const open = channelHub()
-    const a = setup({ channel: open() })
-    const b = setup({ channel: open() })
-    a.tracker.start()
-    b.tracker.start()
+    const firstTab = setup({ channel: open() })
+    const secondTab = setup({ channel: open() })
+    firstTab.tracker.start()
+    secondTab.tracker.start()
     vi.advanceTimersByTime(TIMEOUT - 30_000)
-    expect(b.tracker.warning).toBe(true)
-    a.tracker.stayConnected()
-    expect(b.onActive).toHaveBeenCalledTimes(1)
-    expect(b.tracker.warning).toBe(false)
+    expect(secondTab.tracker.warning).toBe(true)
+    firstTab.tracker.stayConnected()
+    expect(secondTab.onActive).toHaveBeenCalledTimes(1)
+    expect(secondTab.tracker.warning).toBe(false)
   })
 
   it('el heartbeat de una pestaña evita heartbeats repetidos en las otras', () => {
     const open = channelHub()
-    const a = setup({ channel: open() })
-    const b = setup({ channel: open() })
-    a.tracker.start()
-    b.tracker.start()
+    const firstTab = setup({ channel: open() })
+    const secondTab = setup({ channel: open() })
+    firstTab.tracker.start()
+    secondTab.tracker.start()
     vi.advanceTimersByTime(2 * MIN)
-    a.tracker.activity()
-    expect(a.heartbeat).toHaveBeenCalledTimes(1)
+    firstTab.tracker.activity()
+    expect(firstTab.heartbeat).toHaveBeenCalledTimes(1)
     vi.advanceTimersByTime(1000)
-    b.tracker.activity()
-    expect(b.heartbeat).not.toHaveBeenCalled()
+    secondTab.tracker.activity()
+    expect(secondTab.heartbeat).not.toHaveBeenCalled()
   })
 
   it('cerrar sesión en una pestaña cierra todas', () => {
     const open = channelHub()
-    const a = setup({ channel: open() })
-    const b = setup({ channel: open() })
-    const c = setup({ channel: open() })
-    a.tracker.start()
-    b.tracker.start()
-    c.tracker.start()
+    const firstTab = setup({ channel: open() })
+    const secondTab = setup({ channel: open() })
+    const thirdTab = setup({ channel: open() })
+    firstTab.tracker.start()
+    secondTab.tracker.start()
+    thirdTab.tracker.start()
 
-    a.tracker.broadcastLogout('manual')
+    firstTab.tracker.broadcastLogout('manual')
 
-    expect(b.onRemoteLogout).toHaveBeenCalledWith('manual')
-    expect(c.onRemoteLogout).toHaveBeenCalledWith('manual')
-    expect(a.onRemoteLogout).not.toHaveBeenCalled()
+    expect(secondTab.onRemoteLogout).toHaveBeenCalledWith('manual')
+    expect(thirdTab.onRemoteLogout).toHaveBeenCalledWith('manual')
+    expect(firstTab.onRemoteLogout).not.toHaveBeenCalled()
     // Las otras dejan de contar: no vuelven a cerrar por inactividad.
     vi.advanceTimersByTime(2 * TIMEOUT)
-    expect(b.onExpire).not.toHaveBeenCalled()
+    expect(secondTab.onExpire).not.toHaveBeenCalled()
   })
 
   it('el cierre por inactividad de una pestaña se propaga a las demás', () => {
     const open = channelHub()
-    const a = setup({ channel: open() })
-    const b = setup({ channel: open() })
-    a.tracker.start()
-    b.tracker.start()
+    const firstTab = setup({ channel: open() })
+    const secondTab = setup({ channel: open() })
+    firstTab.tracker.start()
+    secondTab.tracker.start()
     vi.advanceTimersByTime(TIMEOUT)
     // Vence primero la de `a` (su timer se registró antes); `b` se entera por el canal.
-    expect(a.onExpire).toHaveBeenCalledWith('idle')
-    expect(b.onRemoteLogout).toHaveBeenCalledWith('idle')
-    expect(b.onExpire).not.toHaveBeenCalled()
+    expect(firstTab.onExpire).toHaveBeenCalledWith('idle')
+    expect(secondTab.onRemoteLogout).toHaveBeenCalledWith('idle')
+    expect(secondTab.onExpire).not.toHaveBeenCalled()
   })
 
   it('abrir una pestaña nueva cuenta como actividad para las demás', () => {
     const open = channelHub()
-    const a = setup({ channel: open() })
-    const b = setup({ channel: open() })
-    a.tracker.start()
+    const firstTab = setup({ channel: open() })
+    const secondTab = setup({ channel: open() })
+    firstTab.tracker.start()
     vi.advanceTimersByTime(20 * MIN)
-    b.tracker.start()
+    secondTab.tracker.start()
     vi.advanceTimersByTime(20 * MIN)
-    expect(a.onExpire).not.toHaveBeenCalled()
-    expect(a.onWarn).not.toHaveBeenCalled()
+    expect(firstTab.onExpire).not.toHaveBeenCalled()
+    expect(firstTab.onWarn).not.toHaveBeenCalled()
   })
 })

@@ -56,7 +56,7 @@ export async function jwkThumbprint(jwk: JsonWebKey): Promise<string> {
   if (!members) throw new Error(`Tipo de llave no soportado: ${jwk.kty}`)
   const record = jwk as Record<string, unknown>
   // JSON sin espacios, miembros en orden lexicográfico (ya ordenados arriba).
-  const canonical = `{${members.map(m => `"${m}":${JSON.stringify(record[m])}`).join(',')}}`
+  const canonical = `{${members.map(member => `"${member}":${JSON.stringify(record[member])}`).join(',')}}`
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical))
   return base64UrlEncode(digest)
 }
@@ -207,7 +207,7 @@ export async function createDpopSigner(store: DpopKeyStore): Promise<DpopSigner>
 
   return {
     jkt() {
-      thumbprint ??= keyPair().then(async p => jwkThumbprint(await publicJwk(p.publicKey)))
+      thumbprint ??= keyPair().then(async generatedPair => jwkThumbprint(await publicJwk(generatedPair.publicKey)))
       return thumbprint
     },
     async proof(htm, htu) {

@@ -30,8 +30,10 @@ class DpopKey:
 
     def sign(self, signing_input: bytes) -> str:
         der = self.private_key.sign(signing_input, ec.ECDSA(hashes.SHA256()))
-        r, s = decode_dss_signature(der)
-        return b64url_encode(r.to_bytes(32, "big") + s.to_bytes(32, "big"))
+        signature_r, signature_s = decode_dss_signature(der)
+        return b64url_encode(
+            signature_r.to_bytes(32, "big") + signature_s.to_bytes(32, "big")
+        )
 
     def proof(
         self,

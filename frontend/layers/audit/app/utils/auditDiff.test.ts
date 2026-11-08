@@ -43,7 +43,7 @@ describe('auditDiffRows', () => {
       email: { before: 'x@y.co', after: null },
       same: { before: 1, after: 1 }
     })
-    expect(rows.map(r => [r.field, r.kind, r.before, r.after])).toEqual([
+    expect(rows.map(row => [row.field, row.kind, row.before, row.after])).toEqual([
       ['description', 'added', '(vacío)', 'nueva'],
       ['email', 'removed', 'x@y.co', '(vacío)'],
       ['name', 'changed', 'A', 'B'],

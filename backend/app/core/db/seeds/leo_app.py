@@ -128,9 +128,7 @@ def _seed_service_role(
         .on_conflict_do_nothing(index_elements=["application_id", "slug"])
     )
     role_id = conn.scalar(
-        select(roles.c.id).where(
-            roles.c.application_id == app_id, roles.c.slug == slug
-        )
+        select(roles.c.id).where(roles.c.application_id == app_id, roles.c.slug == slug)
     )
     conn.execute(
         insert(RoleAction.__table__)

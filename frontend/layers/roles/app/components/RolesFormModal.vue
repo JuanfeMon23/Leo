@@ -32,7 +32,7 @@ const form = useZodForm(roleCreateSchema, {
 })
 
 const appOptions = computed(() =>
-  activeSelectOptions(props.applications, a => a.name, props.role?.application_id)
+  activeSelectOptions(props.applications, application => application.name, props.role?.application_id)
 )
 
 const onSubmit = form.submit(async (values) => {

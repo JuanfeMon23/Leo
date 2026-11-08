@@ -21,14 +21,16 @@ async def test_crear_rol_y_asignar_acciones_de_su_app(session, admin):
     assert created.status_code == 201, created.text
     role_id = created.json()["id"]
     detail = (await admin.get(f"/api/v1/applications/{app.app.id}")).json()
-    action_ids = [a["id"] for m in detail["modules"] for a in m["actions"]]
+    action_ids = [
+        action["id"] for module in detail["modules"] for action in module["actions"]
+    ]
 
     added = await admin.post(
         f"{ROLES}/{role_id}/actions", json={"action_ids": action_ids}
     )
     assert added.status_code == 200, added.text
-    assert sorted(a["tag"] for a in added.json()["actions"]) == sorted(
-        f"{app.app.slug}.items.{v}" for v in ("edit", "view")
+    assert sorted(action["tag"] for action in added.json()["actions"]) == sorted(
+        f"{app.app.slug}.items.{verb}" for verb in ("edit", "view")
     )
     event = await session.scalar(
         select(AuditEvent).where(
@@ -82,7 +84,8 @@ async def test_desactivar_rol_quita_el_acceso(session, admin, make_browser):
     await grant(session, user, role)
     nav = await login_as(session, make_browser, user)
     assert [
-        a["slug"] for a in (await nav.get("/api/v1/auth/me")).json()["applications"]
+        action["slug"]
+        for action in (await nav.get("/api/v1/auth/me")).json()["applications"]
     ] == [app.app.slug]
     assert (await admin.post(f"{ROLES}/{role.id}/deactivate")).status_code == 200
     assert (await nav.get("/api/v1/auth/me")).json()["applications"] == []
@@ -106,7 +109,7 @@ async def test_listar_roles_por_app(session, admin):
     await make_role(session, app.app.id, slug="dos")
     await session.commit()
     page = (await admin.get(f"{ROLES}?application_id={app.app.id}")).json()
-    assert [r["slug"] for r in page["items"]] == ["dos", "uno"]
+    assert [role["slug"] for role in page["items"]] == ["dos", "uno"]
 
 
 async def test_no_renombrar_slug_de_rol(session, admin):

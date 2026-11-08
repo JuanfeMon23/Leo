@@ -32,9 +32,9 @@ function toggleGroup(group: RolesPermissionGroup, on: boolean) {
   emit('update:selected', rolesSetGroup(group, props.selected, on))
 }
 
-const grantedIn = (group: RolesPermissionGroup) => group.permissions.filter(p => props.selected.has(p.id))
+const grantedIn = (group: RolesPermissionGroup) => group.permissions.filter(permission => props.selected.has(permission.id))
 const grantedGroups = computed(() => props.model.groups.filter(group => grantedIn(group).length > 0))
-const markedIn = (group: RolesPermissionGroup) => group.permissions.filter(p => props.selected.has(p.id)).length
+const markedIn = (group: RolesPermissionGroup) => group.permissions.filter(permission => props.selected.has(permission.id)).length
 </script>
 
 <template>

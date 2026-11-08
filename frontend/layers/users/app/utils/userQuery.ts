@@ -11,11 +11,11 @@ export interface UsersQueryInput {
 
 /** Query de `GET /users`: solo envía `q` y `active` cuando tienen valor. */
 export function buildUsersQuery(input: UsersQueryInput) {
-  const q = normalizeSearchTerm(input.search)
+  const query = normalizeSearchTerm(input.search)
   return {
     page: input.page,
     page_size: USERS_PAGE_SIZE,
-    ...(q ? { q } : {}),
+    ...(query ? { q: query } : {}),
     ...(input.active !== undefined ? { active: input.active } : {})
   }
 }

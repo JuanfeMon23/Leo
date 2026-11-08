@@ -12,7 +12,7 @@ def str_enum(enum_cls: type[enum.StrEnum], name: str, length: int) -> Enum:
         enum_cls,
         native_enum=False,
         length=length,
-        values_callable=lambda e: [m.value for m in e],
+        values_callable=lambda enum_class: [member.value for member in enum_class],
         create_constraint=True,
         name=name,
     )

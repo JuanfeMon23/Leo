@@ -42,7 +42,7 @@ async def test_crear_usuario_no_expone_el_hash_y_audita_sin_secretos(session, ad
         )
     )
     assert event.changes["username"]["after"] == "maria.perez"
-    assert not any("password" in k for k in event.changes)
+    assert not any("password" in key for key in event.changes)
 
 
 async def test_contrasena_debil_422_con_motivos(admin):
@@ -143,7 +143,7 @@ async def test_asignar_y_quitar_roles(session, admin):
         f"{USERS}/{user.id}/roles", json={"role_ids": [str(role.id)]}
     )
     assert added.status_code == 200, added.text
-    assert [r["slug"] for r in added.json()["roles"]] == [role.slug]
+    assert [role["slug"] for role in added.json()["roles"]] == [role.slug]
     again = await admin.post(
         f"{USERS}/{user.id}/roles", json={"role_ids": [str(role.id)]}
     )
@@ -177,7 +177,7 @@ async def test_listado_con_busqueda(session, admin):
     await make_user(session, first_name="Zacarías", username="zacarias-x")
     await session.commit()
     page = (await admin.get(f"{USERS}?q=zacar")).json()
-    assert [u["username"] for u in page["items"]] == ["zacarias-x"]
+    assert [user_item["username"] for user_item in page["items"]] == ["zacarias-x"]
 
 
 async def test_usuario_inexistente_404_legible(admin):
@@ -188,6 +188,6 @@ async def test_usuario_inexistente_404_legible(admin):
 
 async def test_detalle_incluye_roles(session, admin):
     detail = (await admin.get(f"{USERS}/{admin.user.id}")).json()
-    assert [r["slug"] for r in detail["roles"]] == [
+    assert [role["slug"] for role in detail["roles"]] == [
         (await leo_admin_role(session)).slug
     ]

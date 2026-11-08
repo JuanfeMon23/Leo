@@ -153,7 +153,9 @@ async def test_update_invalido_se_rechaza(
     await conn.execute(text(INSERT_SETTING), setting())
     key = {"k": "sessions.idle_timeout"}
     assert (
-        await expect_error("UPDATE settings SET value = '999'::jsonb WHERE key = :k", key)
+        await expect_error(
+            "UPDATE settings SET value = '999'::jsonb WHERE key = :k", key
+        )
         == CHECK_VIOLATION
     )
     assert (

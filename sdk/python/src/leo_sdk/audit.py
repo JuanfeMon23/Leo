@@ -45,12 +45,12 @@ def scrub(value: Any, sensitive: Iterable[str] = DEFAULT_SENSITIVE) -> Any:
     sensitive = tuple(sensitive)
     if isinstance(value, Mapping):
         return {
-            str(k): scrub(v, sensitive)
-            for k, v in value.items()
-            if not _is_sensitive(k, sensitive)
+            str(child_key): scrub(child_value, sensitive)
+            for child_key, child_value in value.items()
+            if not _is_sensitive(child_key, sensitive)
         }
     if isinstance(value, list | tuple | set | frozenset):
-        return [scrub(v, sensitive) for v in value]
+        return [scrub(item, sensitive) for item in value]
     return _jsonable(value)
 
 
@@ -127,7 +127,7 @@ class AuditClient:
             "user_agent": user_agent,
             "request_id": request_id,
         }
-        payload = {k: v for k, v in payload.items() if v is not None}
+        payload = {key: value for key, value in payload.items() if value is not None}
         await self.flush()
         fallback = dict(payload)
         if actor is not None and actor.is_service:

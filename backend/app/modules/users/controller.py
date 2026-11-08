@@ -181,9 +181,12 @@ async def check_credentials(
 
 
 async def list_users(
-    session: AsyncSession, q: str | None, active: bool | None, pagination: Pagination
+    session: AsyncSession,
+    search_text: str | None,
+    active: bool | None,
+    pagination: Pagination,
 ) -> Page[UserRead]:
-    stmt = repository.list_statement(q, active)
+    stmt = repository.list_statement(search_text, active)
     return await paginate(session, stmt, pagination, UserRead, User.username)
 
 
@@ -194,13 +197,13 @@ async def _detail(session: AsyncSession, user: User) -> UserDetail:
         **UserRead.model_validate(user).model_dump(),
         roles=[
             UserRoleRead(
-                id=b.id,
-                application_id=b.application_id,
-                slug=b.slug,
-                name=b.name,
-                is_active=b.is_active,
+                id=brief.id,
+                application_id=brief.application_id,
+                slug=brief.slug,
+                name=brief.name,
+                is_active=brief.is_active,
             )
-            for b in sorted(briefs.values(), key=lambda b: b.slug)
+            for brief in sorted(briefs.values(), key=lambda brief: brief.slug)
         ],
     )
 
@@ -404,7 +407,9 @@ async def update_own_profile(
     return True
 
 
-async def is_email_change(session: AsyncSession, user_id: UUID, data: ProfileUpdate) -> bool:
+async def is_email_change(
+    session: AsyncSession, user_id: UUID, data: ProfileUpdate
+) -> bool:
     """True si `data` pide otro correo (sin distinguir mayusculas: cambiar solo
     la capitalizacion no cede la cuenta a nadie)."""
     if data.email is None:
@@ -492,7 +497,11 @@ async def remove_role(
     if not await repository.remove_role(session, user.id, role_id):
         raise not_found("un rol asignado a este usuario", role_id)
     await _audit_roles(
-        session, actor, user.id, current, [r for r in current if r != role_id]
+        session,
+        actor,
+        user.id,
+        current,
+        [other_role_id for other_role_id in current if other_role_id != role_id],
     )
     await session.commit()
     return await _detail(session, user)
@@ -512,8 +521,8 @@ async def _audit_roles(
             entity_type="user",
             entity_id=str(user_id),
             changes=diff(
-                {"role_ids": sorted(str(r) for r in before)},
-                {"role_ids": sorted(str(r) for r in after)},
+                {"role_ids": sorted(str(role_id) for role_id in before)},
+                {"role_ids": sorted(str(role_id) for role_id in after)},
             ),
         ),
     )

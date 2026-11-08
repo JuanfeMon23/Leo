@@ -103,7 +103,7 @@ describe('ApplicationsList', () => {
     expect(api).not.toHaveBeenCalledWith('/applications/a1/deactivate', expect.anything())
 
     api.mockImplementation(async (path: string) => (path === '/applications' ? page([app({ is_active: false })]) : app({ is_active: false })))
-    const confirm = [...document.body.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Desactivar' && b.closest('[role="dialog"]'))!
+    const confirm = [...document.body.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Desactivar' && button.closest('[role="dialog"]'))!
     confirm.click()
     await flushPromises()
     expect(api).toHaveBeenCalledWith('/applications/a1/deactivate', { method: 'POST' })
@@ -117,7 +117,7 @@ describe('ApplicationsList', () => {
       if (path === '/applications') return page([app()])
       throw new LeoApiError(409, 'leo_app_protected', 'texto')
     })
-    const confirm = [...document.body.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Desactivar' && b.closest('[role="dialog"]'))!
+    const confirm = [...document.body.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Desactivar' && button.closest('[role="dialog"]'))!
     confirm.click()
     await flushPromises()
     expect(document.body.querySelector('[role="dialog"]')!.textContent).toContain('no se puede modificar')
@@ -128,7 +128,7 @@ describe('ApplicationsList', () => {
     const wrapper = await mountList()
     await wrapper.get('[data-testid="app-rotate"]').trigger('click')
     api.mockImplementation(async (path: string) => (path === '/applications' ? page([app()]) : { client_id: 'vladimir', client_secret: 'NUEVO-SECRETO' }))
-    const confirm = [...document.body.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Rotar secreto' && b.closest('[role="dialog"]'))!
+    const confirm = [...document.body.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Rotar secreto' && button.closest('[role="dialog"]'))!
     confirm.click()
     await flushPromises()
     expect(api).toHaveBeenCalledWith('/applications/a1/rotate-secret', { method: 'POST' })

@@ -24,7 +24,7 @@ CONSTRAINTS = {
 
 
 async def names(session, sql):
-    return {r[0] for r in (await session.execute(text(sql))).all()}
+    return {row[0] for row in (await session.execute(text(sql))).all()}
 
 
 async def test_schema_has_explicit_names_index_and_triggers(session):

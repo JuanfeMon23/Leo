@@ -29,14 +29,14 @@ describe('applicationsGroupServiceGrants', () => {
       grant('2', 'acuarius', 'Acuarius', 'Operador'),
       grant('3', 'vladimir', 'Vladimir', 'Analista')
     ])
-    expect(groups.map(g => g.application.name)).toEqual(['Acuarius', 'Vladimir'])
-    expect(groups[1]!.grants.map(g => g.role.name)).toEqual(['Analista', 'Lector'])
+    expect(groups.map(group => group.application.name)).toEqual(['Acuarius', 'Vladimir'])
+    expect(groups[1]!.grants.map(entry => entry.role.name)).toEqual(['Analista', 'Lector'])
   })
 
   it('no muta la entrada', () => {
     const input = [grant('1', 'b', 'B', 'X'), grant('2', 'a', 'A', 'Y')]
     applicationsGroupServiceGrants(input)
-    expect(input.map(g => g.id)).toEqual(['1', '2'])
+    expect(input.map(group => group.id)).toEqual(['1', '2'])
   })
 })
 
@@ -47,7 +47,7 @@ describe('applicationsGrantableTargets', () => {
 
   it('excluye la app actual y la app leo', () => {
     const apps = [app('1', 'incubus', 'Incubus'), app('2', 'leo', 'Leo'), app('3', 'vladimir', 'Vladimir')]
-    expect(applicationsGrantableTargets(apps, '1').map(a => a.slug)).toEqual(['vladimir'])
+    expect(applicationsGrantableTargets(apps, '1').map(application => application.slug)).toEqual(['vladimir'])
   })
 })
 
@@ -58,7 +58,7 @@ describe('applicationsGrantSummary', () => {
 })
 
 describe('applicationsServiceAccessErrorMessage', () => {
-  const e = (code: string) => new LeoApiError(422, code, 'texto del backend')
+  const buildApiError = (code: string) => new LeoApiError(422, code, 'texto del backend')
 
   it.each([
     ['same_application', 'otra aplicación'],
@@ -66,7 +66,7 @@ describe('applicationsServiceAccessErrorMessage', () => {
     ['leo_app_not_grantable', 'Leo'],
     ['invalid_reference', 'ya no existen']
   ])('%s: texto propio legible', (code, fragment) => {
-    expect(applicationsServiceAccessErrorMessage(e(code))).toContain(fragment)
+    expect(applicationsServiceAccessErrorMessage(buildApiError(code))).toContain(fragment)
   })
 
   it('403: mensaje del backend', () => {

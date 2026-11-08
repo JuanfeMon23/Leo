@@ -13,11 +13,11 @@ export interface RolesQueryInput {
 
 /** Query de `GET /roles`: solo envía `q`, `active` y `application_id` cuando tienen valor. */
 export function buildRolesQuery(input: RolesQueryInput) {
-  const q = normalizeSearchTerm(input.search)
+  const query = normalizeSearchTerm(input.search)
   return {
     page: input.page,
     page_size: ROLES_PAGE_SIZE,
-    ...(q ? { q } : {}),
+    ...(query ? { q: query } : {}),
     ...(input.active !== undefined ? { active: input.active } : {}),
     ...(input.applicationId ? { application_id: input.applicationId } : {})
   }

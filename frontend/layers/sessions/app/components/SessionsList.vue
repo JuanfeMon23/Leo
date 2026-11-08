@@ -18,7 +18,7 @@ onMounted(() => {
 })
 
 const userOptions = computed(() =>
-  list.users.value.map(u => ({ value: u.id, label: `${`${u.first_name} ${u.last_name}`.trim()} (${u.username})` })))
+  list.users.value.map(user => ({ value: user.id, label: `${`${user.first_name} ${user.last_name}`.trim()} (${user.username})` })))
 
 const canRevoke = useCan('leo.auth.revoke')
 

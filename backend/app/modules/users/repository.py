@@ -9,11 +9,11 @@ from app.core.pagination import only_active, search
 from app.modules.users.models import DocumentType, User, UserRole
 
 
-def list_statement(q: str | None, active: bool | None) -> Select:
+def list_statement(search_text: str | None, active: bool | None) -> Select:
     stmt = select(User)
     stmt = search(
         stmt,
-        q,
+        search_text,
         User.username,
         User.email,
         User.first_name,

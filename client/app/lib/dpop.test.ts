@@ -37,8 +37,8 @@ describe('jwkThumbprint (RFC 7638)', () => {
   })
 
   it('ignora miembros que no son obligatorios (orden y extras no cambian el resultado)', async () => {
-    const a = await jwkThumbprint({ crv: 'P-256', kty: 'EC', x: 'l8tFrhx-34tV3hRICRDY9zCkDlpBhF42UQUfWVAWBFs', y: '9VE4jf_Ok_o64zbTTlcuNJajHmt6v9TDVrU0CdvGRDA', ext: true, key_ops: ['verify'] })
-    expect(a).toBe('0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I')
+    const thumbprint = await jwkThumbprint({ crv: 'P-256', kty: 'EC', x: 'l8tFrhx-34tV3hRICRDY9zCkDlpBhF42UQUfWVAWBFs', y: '9VE4jf_Ok_o64zbTTlcuNJajHmt6v9TDVrU0CdvGRDA', ext: true, key_ops: ['verify'] })
+    expect(thumbprint).toBe('0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I')
   })
 })
 
@@ -68,21 +68,21 @@ describe('createDpopProof', () => {
       iat: 1_700_000_000,
       jti: 'jti-fijo'
     })
-    const [h, p, s] = proof.split('.')
-    expect(h && p && s).toBeTruthy()
+    const [headerPart, payloadPart, signaturePart] = proof.split('.')
+    expect(headerPart && payloadPart && signaturePart).toBeTruthy()
 
-    const header = decodeJson(h!)
+    const header = decodeJson(headerPart!)
     expect(header).toMatchObject({ typ: 'dpop+jwt', alg: 'ES256' })
     expect(header.jwk).toEqual(await publicJwk(pair.publicKey))
 
-    expect(decodeJson(p!)).toEqual({
+    expect(decodeJson(payloadPart!)).toEqual({
       htm: 'POST',
       htu: 'http://localhost:8100/api/v1/auth/login',
       iat: 1_700_000_000,
       jti: 'jti-fijo'
     })
 
-    const signature = base64UrlDecode(s!)
+    const signature = base64UrlDecode(signaturePart!)
     expect(signature.byteLength).toBe(64) // r||s (IEEE P1363), no DER
     const publicKey = await crypto.subtle.importKey(
       'jwk',
@@ -95,7 +95,7 @@ describe('createDpopProof', () => {
       { name: 'ECDSA', hash: 'SHA-256' },
       publicKey,
       signature,
-      new TextEncoder().encode(`${h}.${p}`)
+      new TextEncoder().encode(`${headerPart}.${payloadPart}`)
     )
     expect(ok).toBe(true)
   })
@@ -103,13 +103,13 @@ describe('createDpopProof', () => {
   it('usa la hora actual en segundos y un jti aleatorio distinto en cada prueba', async () => {
     const pair = await generateDpopKeyPair()
     const before = Math.floor(Date.now() / 1000)
-    const a = decodeJson((await createDpopProof(pair, { htm: 'GET', htu: 'http://x/a' })).split('.')[1]!)
-    const b = decodeJson((await createDpopProof(pair, { htm: 'GET', htu: 'http://x/a' })).split('.')[1]!)
-    expect(a.iat).toBeGreaterThanOrEqual(before)
-    expect(Number.isInteger(a.iat)).toBe(true)
-    expect(typeof a.jti).toBe('string')
-    expect((a.jti as string).length).toBeGreaterThanOrEqual(22)
-    expect(a.jti).not.toBe(b.jti)
+    const payload = decodeJson((await createDpopProof(pair, { htm: 'GET', htu: 'http://x/a' })).split('.')[1]!)
+    const secondSigner = decodeJson((await createDpopProof(pair, { htm: 'GET', htu: 'http://x/a' })).split('.')[1]!)
+    expect(payload.iat).toBeGreaterThanOrEqual(before)
+    expect(Number.isInteger(payload.iat)).toBe(true)
+    expect(typeof payload.jti).toBe('string')
+    expect((payload.jti as string).length).toBeGreaterThanOrEqual(22)
+    expect(payload.jti).not.toBe(secondSigner.jti)
   })
 
   it('quita query y fragmento del htu', async () => {
@@ -149,8 +149,8 @@ describe('createDpopSigner', () => {
 
   it('dos pestañas que generan llave a la vez terminan con la misma (claim atómico)', async () => {
     const store = memoryDpopKeyStore()
-    const [a, b] = await Promise.all([createDpopSigner(store), createDpopSigner(store)])
-    const [jktA, jktB] = await Promise.all([a.jkt(), b.jkt()])
+    const [firstSigner, secondSigner] = await Promise.all([createDpopSigner(store), createDpopSigner(store)])
+    const [jktA, jktB] = await Promise.all([firstSigner.jkt(), secondSigner.jkt()])
     expect(jktA).toBe(jktB)
   })
 

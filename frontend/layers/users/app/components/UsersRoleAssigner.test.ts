@@ -23,7 +23,7 @@ const mountIt = (opts = options) => mountSuspended(UsersRoleAssigner, { props: {
 describe('UsersRoleAssigner', () => {
   it('ofrece «Aplicación → Rol» y el botón empieza deshabilitado', async () => {
     const wrapper = await mountIt()
-    expect([...wrapper.get('select').element.querySelectorAll('option')].map(o => o.textContent?.trim())).toEqual(['Aplicación → Rol', 'Leo → Administrador', 'Taurus → Cajero'])
+    expect([...wrapper.get('select').element.querySelectorAll('option')].map(option => option.textContent?.trim())).toEqual(['Aplicación → Rol', 'Leo → Administrador', 'Taurus → Cajero'])
     expect(wrapper.get('[data-testid="role-assign"]').attributes('disabled')).toBeDefined()
   })
 

@@ -45,7 +45,7 @@ describe('UsersList', () => {
 
   it('estado: activo, inactivo y bloqueado hasta HH:MM; último acceso o «Nunca»', async () => {
     const wrapper = await mountList()
-    const statuses = wrapper.findAll('[data-testid="user-status"]').map(s => s.attributes('data-status'))
+    const statuses = wrapper.findAll('[data-testid="user-status"]').map(userStatus => userStatus.attributes('data-status'))
     expect(statuses).toEqual(['active', 'inactive', 'locked'])
     expect(wrapper.text()).toMatch(/Bloqueado hasta \d{2}:\d{2}/)
     expect(wrapper.text()).toContain('Nunca')

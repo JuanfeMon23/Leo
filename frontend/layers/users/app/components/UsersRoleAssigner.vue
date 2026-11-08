@@ -25,7 +25,7 @@ async function assign() {
   saving.value = true
   error.value = null
   try {
-    const label = props.options.find(o => o.value === roleId.value)?.label ?? 'el rol'
+    const label = props.options.find(option => option.value === roleId.value)?.label ?? 'el rol'
     const detail = await api.addRoles(props.userId, [roleId.value])
     roleId.value = ''
     toast.success(`Rol asignado: ${label}.`)

@@ -107,8 +107,8 @@ class MemoryRateLimitStore:
             if key is not None:
                 self._hits.pop((bucket, key), None)
                 return
-            for k in [k for k in self._hits if k[0] == bucket]:
-                del self._hits[k]
+            for hit_key in [hit_key for hit_key in self._hits if hit_key[0] == bucket]:
+                del self._hits[hit_key]
 
 
 _LOCK = "SELECT pg_advisory_xact_lock(hashtextextended(:lock_key, 0))"

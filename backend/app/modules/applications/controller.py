@@ -160,9 +160,12 @@ async def leo_application_id(session: AsyncSession) -> UUID:
 
 
 async def list_applications(
-    session: AsyncSession, q: str | None, active: bool | None, pagination: Pagination
+    session: AsyncSession,
+    search_text: str | None,
+    active: bool | None,
+    pagination: Pagination,
 ) -> Page[ApplicationRead]:
-    stmt = repository.list_statement(q, active)
+    stmt = repository.list_statement(search_text, active)
     return await paginate(session, stmt, pagination, ApplicationRead, Application.slug)
 
 
@@ -179,10 +182,10 @@ async def get_application(session: AsyncSession, app_id: UUID) -> ApplicationDet
         **ApplicationRead.model_validate(app).model_dump(),
         modules=[
             ModuleWithActions(
-                **ModuleRead.model_validate(m).model_dump(),
-                actions=by_module.get(m.id, []),
+                **ModuleRead.model_validate(module).model_dump(),
+                actions=by_module.get(module.id, []),
             )
-            for m in modules
+            for module in modules
         ],
     )
 
@@ -484,10 +487,14 @@ async def sync_catalog(
         raise LeoAppProtectedError()
 
     result = CatalogSyncResult()
-    modules = {m.slug: m for m in await repository.modules_of(session, app.id)}
-    actions = {a.tag: a for a in await repository.actions_of(session, app.id)}
+    modules = {
+        module.slug: module for module in await repository.modules_of(session, app.id)
+    }
+    actions = {
+        action.tag: action for action in await repository.actions_of(session, app.id)
+    }
     declared_tags: set[str] = set()
-    taken_names = {(a.module_id, a.name) for a in actions.values()}
+    taken_names = {(action.module_id, action.name) for action in actions.values()}
 
     for declared in catalog.modules:
         module = modules.get(declared.slug)
@@ -547,7 +554,7 @@ async def sync_catalog(
                 result.updated_actions.append(tag)
 
     if catalog.deactivate_missing:
-        declared_modules = {m.slug for m in catalog.modules}
+        declared_modules = {module.slug for module in catalog.modules}
         for module in modules.values():
             if module.slug not in declared_modules and module.is_active:
                 module.is_active = False
@@ -567,7 +574,9 @@ async def sync_catalog(
                 entity_type="application",
                 entity_id=str(app.id),
                 changes={
-                    k: {"before": None, "after": v} for k, v in summary.items() if v
+                    key: {"before": None, "after": value}
+                    for key, value in summary.items()
+                    if value
                 },
                 reason=f"Sincronización del catálogo por el cliente «{client.client_id}».",
                 request_id=request_id,

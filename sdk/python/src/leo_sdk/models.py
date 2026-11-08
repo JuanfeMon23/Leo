@@ -127,7 +127,9 @@ class LeoUser:
                 ),
                 "idle_timeout_seconds": self.idle_timeout_seconds,
             },
-            "applications": [a.model_dump() for a in self.applications],
+            "applications": [
+                application.model_dump() for application in self.applications
+            ],
         }
 
 
@@ -164,13 +166,13 @@ class PasswordPolicy(BaseModel):
             problems.append("too_short")
         if len(password) > self.max_length:
             problems.append("too_long")
-        if self.require_lowercase and not any(c.islower() for c in password):
+        if self.require_lowercase and not any(char.islower() for char in password):
             problems.append("no_lowercase")
-        if self.require_uppercase and not any(c.isupper() for c in password):
+        if self.require_uppercase and not any(char.isupper() for char in password):
             problems.append("no_uppercase")
-        if self.require_digit and not any(c.isdigit() for c in password):
+        if self.require_digit and not any(char.isdigit() for char in password):
             problems.append("no_digit")
-        if self.require_symbol and all(c.isalnum() for c in password):
+        if self.require_symbol and all(char.isalnum() for char in password):
             problems.append("no_symbol")
         return problems
 

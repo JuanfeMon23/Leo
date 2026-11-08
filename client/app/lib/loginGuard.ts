@@ -42,7 +42,7 @@ export function createLoginLoopGuard(options: LoginLoopGuardOptions = {}): Login
       const raw = storage()?.getItem(KEY)
       if (raw == null) return memory
       const parsed: unknown = JSON.parse(raw)
-      return Array.isArray(parsed) ? parsed.filter((n): n is number => typeof n === 'number') : []
+      return Array.isArray(parsed) ? parsed.filter((count): count is number => typeof count === 'number') : []
     } catch {
       return memory
     }
@@ -57,13 +57,13 @@ export function createLoginLoopGuard(options: LoginLoopGuardOptions = {}): Login
 
   return {
     attempt() {
-      const t = now()
-      const recent = read().filter(at => t - at < windowMs)
+      const timestamp = now()
+      const recent = read().filter(at => timestamp - at < windowMs)
       if (recent.length >= max) {
         write(recent)
         return false
       }
-      write([...recent, t])
+      write([...recent, timestamp])
       return true
     },
     reset() {

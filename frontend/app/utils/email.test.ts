@@ -6,8 +6,8 @@ describe('zEmail', () => {
     expect(zEmail.parse('  ana@x.co ')).toBe('ana@x.co')
   })
 
-  it.each(['', '   ', 'sin-arroba', 'a b@x.co', 'a@b c'])('rechaza «%s»', (v) => {
-    expect(zEmail.safeParse(v).success).toBe(false)
+  it.each(['', '   ', 'sin-arroba', 'a b@x.co', 'a@b c'])('rechaza «%s»', (value) => {
+    expect(zEmail.safeParse(value).success).toBe(false)
   })
 
   it('máximo 254 caracteres', () => {

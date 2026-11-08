@@ -35,13 +35,13 @@ describe('menú lateral: Roles', () => {
   it('aparece con leo.roles.view', async () => {
     signInWith(['leo.roles.view'])
     const wrapper = await mountSuspended(DefaultLayout)
-    const link = wrapper.findAll('a').find(a => a.text().includes('Roles'))
+    const link = wrapper.findAll('a').find(navLink => navLink.text().includes('Roles'))
     expect(link?.attributes('href')).toBe('/roles')
   })
 
   it('no aparece sin ese tag', async () => {
     signInWith(['leo.applications.view'])
     const wrapper = await mountSuspended(DefaultLayout)
-    expect(wrapper.findAll('a').some(a => a.text().includes('Roles'))).toBe(false)
+    expect(wrapper.findAll('a').some(link => link.text().includes('Roles'))).toBe(false)
   })
 })

@@ -34,8 +34,8 @@ def sha256_b64url(value: str) -> str:
     return b64url_encode(hashlib.sha256(value.encode("utf-8")).digest())
 
 
-def constant_time_equals(a: str, b: str) -> bool:
-    return hmac.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
+def constant_time_equals(left: str, right: str) -> bool:
+    return hmac.compare_digest(left.encode("utf-8"), right.encode("utf-8"))
 
 
 def random_token(nbytes: int = 32) -> str:

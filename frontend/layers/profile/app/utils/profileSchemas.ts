@@ -41,11 +41,11 @@ export function passwordChangeSchema(policy: () => PasswordPolicy) {
     current_password: requiredPassword('Ingresa tu contraseña actual.'),
     new_password: zLazyPassword(policy, { required: 'Ingresa la contraseña nueva.' }),
     confirm_password: requiredPassword('Confirma la contraseña nueva.')
-  }).superRefine((v, issue) => {
-    if (v.new_password && v.new_password === v.current_password) {
+  }).superRefine((values, issue) => {
+    if (values.new_password && values.new_password === values.current_password) {
       issue.addIssue({ code: 'custom', path: ['new_password'], message: 'La contraseña nueva debe ser distinta de la actual.' })
     }
-    if (v.confirm_password && v.new_password !== v.confirm_password) {
+    if (values.confirm_password && values.new_password !== values.confirm_password) {
       issue.addIssue({ code: 'custom', path: ['confirm_password'], message: 'Las contraseñas no coinciden.' })
     }
   })

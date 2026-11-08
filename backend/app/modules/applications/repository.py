@@ -31,9 +31,11 @@ async def leo_application_id(session: AsyncSession) -> UUID:
     return app_id
 
 
-def list_statement(q: str | None, active: bool | None) -> Select:
+def list_statement(search_text: str | None, active: bool | None) -> Select:
     stmt = select(Application)
-    stmt = search(stmt, q, Application.slug, Application.name, Application.description)
+    stmt = search(
+        stmt, search_text, Application.slug, Application.name, Application.description
+    )
     return only_active(stmt, active, Application.is_active)
 
 

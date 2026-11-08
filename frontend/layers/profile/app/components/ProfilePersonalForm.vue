@@ -18,10 +18,10 @@ const toast = useToast()
 
 const user = computed(() => session.user.value)
 
-const toValues = (u: LeoUser | null) => ({
-  first_name: u?.first_name ?? '',
-  last_name: u?.last_name ?? '',
-  email: u?.email ?? ''
+const toValues = (currentUser: LeoUser | null) => ({
+  first_name: currentUser?.first_name ?? '',
+  last_name: currentUser?.last_name ?? '',
+  email: currentUser?.email ?? ''
 })
 
 const form = useZodForm(profileFormSchema(() => user.value?.email ?? ''), {

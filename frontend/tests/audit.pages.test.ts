@@ -39,14 +39,14 @@ describe('menú lateral: Auditoría y Sesiones', () => {
   it('aparecen con sus tags de consulta', async () => {
     signInWith(['leo.audit.view', 'leo.auth.view'])
     const wrapper = await mountSuspended(DefaultLayout)
-    expect(wrapper.findAll('a').find(a => a.text().includes('Auditoría'))?.attributes('href')).toBe('/audit')
-    expect(wrapper.findAll('a').find(a => a.text().includes('Sesiones'))?.attributes('href')).toBe('/sessions')
+    expect(wrapper.findAll('a').find(link => link.text().includes('Auditoría'))?.attributes('href')).toBe('/audit')
+    expect(wrapper.findAll('a').find(link => link.text().includes('Sesiones'))?.attributes('href')).toBe('/sessions')
   })
 
   it('no aparecen sin esos tags', async () => {
     signInWith(['leo.applications.view'])
     const wrapper = await mountSuspended(DefaultLayout)
-    expect(wrapper.findAll('a').some(a => a.text().includes('Auditoría'))).toBe(false)
-    expect(wrapper.findAll('a').some(a => a.text().includes('Sesiones'))).toBe(false)
+    expect(wrapper.findAll('a').some(link => link.text().includes('Auditoría'))).toBe(false)
+    expect(wrapper.findAll('a').some(link => link.text().includes('Sesiones'))).toBe(false)
   })
 })

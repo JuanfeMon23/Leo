@@ -31,10 +31,10 @@ describe('resultado', () => {
 
 describe('nombres desde el catálogo', () => {
   it('aplicación, módulo y acción por su nombre', () => {
-    const c = catalog()
-    expect(auditApplicationName(c, 'a1')).toBe('Leo')
-    expect(auditModuleName(c, 'a1', 'users')).toBe('Usuarios')
-    expect(auditActionName(c, 'a1', 'leo.users.edit')).toBe('Editar usuario')
+    const builtCatalog = catalog()
+    expect(auditApplicationName(builtCatalog, 'a1')).toBe('Leo')
+    expect(auditModuleName(builtCatalog, 'a1', 'users')).toBe('Usuarios')
+    expect(auditActionName(builtCatalog, 'a1', 'leo.users.edit')).toBe('Editar usuario')
   })
 
   it('sin catálogo cae en el identificador técnico', () => {

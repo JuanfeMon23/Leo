@@ -301,8 +301,10 @@ async def test_revoca_las_otras_sesiones_y_mantiene_la_actual(session, make_brow
             .execution_options(populate_existing=True)
         )
     )
-    revoked = [s for s in rows if s.revoked_at is not None]
-    alive = [s for s in rows if s.revoked_at is None]
+    revoked = [
+        auth_session for auth_session in rows if auth_session.revoked_at is not None
+    ]
+    alive = [auth_session for auth_session in rows if auth_session.revoked_at is None]
     assert len(revoked) == 1 and len(alive) == 1
     assert revoked[0].revoked_reason == "password-change"
 
@@ -315,7 +317,9 @@ async def test_revoca_tokens_de_apps_de_las_otras_sesiones(session, make_browser
     sessions = list(
         await session.scalars(select(Session).where(Session.user_id == user.id))
     )
-    victim_session = next(s for s in sessions if s.jkt == other.key.jkt)
+    victim_session = next(
+        auth_session for auth_session in sessions if auth_session.jkt == other.key.jkt
+    )
     session.add(
         Token(
             token_hash="a" * 64,
@@ -548,8 +552,8 @@ async def test_cambiar_correo_cierra_las_otras_sesiones(session, make_browser):
     assert (await current.get(ME)).status_code == 200
     assert (await other.get(ME)).status_code == 401
     reasons = [
-        s.revoked_reason
-        for s in await session.scalars(
+        auth_session.revoked_reason
+        for auth_session in await session.scalars(
             select(Session)
             .where(Session.user_id == user.id, Session.revoked_at.is_not(None))
             .execution_options(populate_existing=True)
@@ -583,7 +587,7 @@ async def test_contrasena_sin_cambio_de_correo_se_ignora(session, make_browser):
 
     assert same.status_code == 200 and names.status_code == 200
     assert await events(session, "leo.users.edit", result="denied") == []
-    assert [e.changes for e in await events(session, "leo.users.edit")] == [
+    assert [event.changes for event in await events(session, "leo.users.edit")] == [
         {"first_name": {"before": "Ana", "after": "Zoe"}}
     ]
 
@@ -605,7 +609,9 @@ async def test_intentos_fallidos_de_correo_bloquean_429_incluso_la_correcta(
 
     for _ in range(5):  # LEO_LOGIN_MAX_FAILED_ATTEMPTS en los tests
         assert (await nav.patch(PROFILE, json=bad)).status_code == 403
-    blocked = await nav.patch(PROFILE, json=email_body(current_password=STRONG_PASSWORD))
+    blocked = await nav.patch(
+        PROFILE, json=email_body(current_password=STRONG_PASSWORD)
+    )
 
     assert blocked.status_code == 429
     assert blocked.json()["code"] == "too_many_attempts"

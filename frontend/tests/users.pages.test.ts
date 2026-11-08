@@ -35,13 +35,13 @@ describe('menú lateral: Usuarios', () => {
   it('aparece con leo.users.view', async () => {
     signInWith(['leo.users.view'])
     const wrapper = await mountSuspended(DefaultLayout)
-    const link = wrapper.findAll('a').find(a => a.text().includes('Usuarios'))
+    const link = wrapper.findAll('a').find(navLink => navLink.text().includes('Usuarios'))
     expect(link?.attributes('href')).toBe('/users')
   })
 
   it('no aparece sin ese tag', async () => {
     signInWith(['leo.roles.view'])
     const wrapper = await mountSuspended(DefaultLayout)
-    expect(wrapper.findAll('a').some(a => a.text().includes('Usuarios'))).toBe(false)
+    expect(wrapper.findAll('a').some(link => link.text().includes('Usuarios'))).toBe(false)
   })
 })

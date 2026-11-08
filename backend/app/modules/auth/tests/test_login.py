@@ -168,7 +168,7 @@ async def test_me_devuelve_permisos_leo_y_apps_accesibles(session, admin):
     body = response.json()
     assert "leo.users.create" in body["permissions"]
     assert body["permissions"] == sorted(body["permissions"])
-    assert [a["slug"] for a in body["applications"]] == ["leo"]
+    assert [application["slug"] for application in body["applications"]] == ["leo"]
     assert body["session"]["idle_timeout_seconds"] == 1800
 
 

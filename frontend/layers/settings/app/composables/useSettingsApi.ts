@@ -6,11 +6,11 @@ import type { SettingHistoryPage, SettingItem, SettingsListResponse, SettingUpda
  */
 export function useSettingsApi() {
   const api = useLeoApi()
-  const key = (k: string) => `/settings/${encodeURIComponent(k)}`
+  const key = (settingKey: string) => `/settings/${encodeURIComponent(settingKey)}`
 
   return {
     list: () => api<SettingsListResponse>('/settings'),
-    history: (k: string, page: number) => api<SettingHistoryPage>(`${key(k)}/history`, { query: { page } }),
-    update: (k: string, body: SettingUpdateBody) => api<SettingItem>(key(k), { method: 'PUT', body })
+    history: (settingKey: string, page: number) => api<SettingHistoryPage>(`${key(settingKey)}/history`, { query: { page } }),
+    update: (settingKey: string, body: SettingUpdateBody) => api<SettingItem>(key(settingKey), { method: 'PUT', body })
   }
 }

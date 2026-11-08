@@ -3,7 +3,7 @@ import type { ApplicationRead, ApplicationsServiceGrant, ApplicationsServiceGran
 import { isProtectedApp } from './actionTag'
 import { applicationErrorMessage } from './applicationErrors'
 
-const byName = (a: string, b: string) => a.localeCompare(b, 'es')
+const byName = (left: string, right: string) => left.localeCompare(right, 'es')
 
 /** Agrupa las concesiones por aplicación destino (apps y roles ordenados por nombre). */
 export function applicationsGroupServiceGrants(grants: readonly ApplicationsServiceGrant[]): ApplicationsServiceGrantGroup[] {
@@ -14,8 +14,8 @@ export function applicationsGroupServiceGrants(grants: readonly ApplicationsServ
     else groups.set(grant.application.id, { application: grant.application, grants: [grant] })
   }
   const result = [...groups.values()]
-  for (const group of result) group.grants.sort((a, b) => byName(a.role.name, b.role.name))
-  return result.sort((a, b) => byName(a.application.name, b.application.name))
+  for (const group of result) group.grants.sort((left, right) => byName(left.role.name, right.role.name))
+  return result.sort((left, right) => byName(left.application.name, right.application.name))
 }
 
 /** Aplicaciones que se pueden elegir como destino: ni la actual ni `leo`. */

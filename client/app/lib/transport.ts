@@ -165,8 +165,8 @@ export function createLeoDirectTransport(options: LeoDirectTransportOptions): Le
       const params = new URLSearchParams()
       if (returnTo && returnTo !== '/') params.set('redirect', returnTo)
       if (reason) params.set('reason', reason)
-      const qs = params.toString()
-      return { url: qs ? `${options.loginPath}?${qs}` : options.loginPath, external: false }
+      const queryString = params.toString()
+      return { url: queryString ? `${options.loginPath}?${queryString}` : options.loginPath, external: false }
     }
   }
 }

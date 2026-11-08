@@ -55,7 +55,7 @@ export function useRolesList() {
     }
   }
 
-  const applicationName = (id: string) => applications.value.find(a => a.id === id)?.name ?? '—'
+  const applicationName = (id: string) => applications.value.find(application => application.id === id)?.name ?? '—'
 
   watch([search, active, applicationId], () => {
     // Fuera de la página 1, volver a ella ya dispara la recarga (watch de `page`).

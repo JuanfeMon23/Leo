@@ -35,7 +35,7 @@ const usedTags = new Set(
     .flatMap(file => readFileSync(file, 'utf8').match(TAG_PATTERN) ?? [])
     .filter(tag => !NOT_PERMISSION_TAGS.has(tag))
 )
-const contractTags = new Set(CONTRACT_ACTIONS.map(a => a.tag))
+const contractTags = new Set(CONTRACT_ACTIONS.map(contractAction => contractAction.tag))
 
 describe('contrato de permisos (backend) vs frontend', () => {
   it('todo tag usado en el código fuente existe en el contrato', () => {
@@ -43,8 +43,8 @@ describe('contrato de permisos (backend) vs frontend', () => {
   })
 
   it('todo tag asignable del contrato está referenciado o justificado en TAGS_WITHOUT_SCREEN', () => {
-    const missing = CONTRACT_ACTIONS.filter(a => a.assignable && !usedTags.has(a.tag) && !TAGS_WITHOUT_SCREEN.has(a.tag))
-    expect(missing.map(a => a.tag)).toEqual([])
+    const missing = CONTRACT_ACTIONS.filter(contractAction => contractAction.assignable && !usedTags.has(contractAction.tag) && !TAGS_WITHOUT_SCREEN.has(contractAction.tag))
+    expect(missing.map(action => action.tag)).toEqual([])
   })
 
   it('TAGS_WITHOUT_SCREEN solo lista tags asignables que de verdad no se usan', () => {
@@ -58,15 +58,15 @@ describe('contrato de permisos (backend) vs frontend', () => {
 describe('derivados del contrato', () => {
   it('los tags son únicos y pertenecen a la app del contrato', () => {
     expect(contractTags.size).toBe(CONTRACT_ACTIONS.length)
-    for (const a of CONTRACT_ACTIONS) expect(a.tag.startsWith(`${PERMISSION_CONTRACT.app}.`)).toBe(true)
+    for (const action of CONTRACT_ACTIONS) expect(action.tag.startsWith(`${PERMISSION_CONTRACT.app}.`)).toBe(true)
   })
 
   it('assignable coincide con que la descripción no sea de evento', () => {
-    for (const a of CONTRACT_ACTIONS) expect(a.assignable).toBe(!isEventAction(a.description))
+    for (const action of CONTRACT_ACTIONS) expect(action.assignable).toBe(!isEventAction(action.description))
   })
 
   it('PERMISSION_NAMES solo tiene acciones asignables', () => {
-    expect(Object.keys(PERMISSION_NAMES).sort()).toEqual(CONTRACT_ACTIONS.filter(a => a.assignable).map(a => a.tag).sort())
+    expect(Object.keys(PERMISSION_NAMES).sort()).toEqual(CONTRACT_ACTIONS.filter(contractAction => contractAction.assignable).map(contractAction => contractAction.tag).sort())
     expect(PERMISSION_NAMES['leo.settings.edit-security']).toBeTruthy()
   })
 

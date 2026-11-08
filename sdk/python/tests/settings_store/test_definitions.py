@@ -63,20 +63,20 @@ def test_invalid_definitions_rejected(over):
 
 
 def test_float_default_normalized_and_bounds_inclusive():
-    d = make(key="ui.ratio", type="float", default=1, min=0.5, max=3)
-    assert d.default == 1.0 and isinstance(d.default, float)
-    assert d.coerce(3) == 3.0 and d.coerce(0.5) == 0.5
+    definition = make(key="ui.ratio", type="float", default=1, min=0.5, max=3)
+    assert definition.default == 1.0 and isinstance(definition.default, float)
+    assert definition.coerce(3) == 3.0 and definition.coerce(0.5) == 0.5
 
 
 def test_coerce_types():
-    d = make()
-    assert d.coerce(10) == 10
+    definition = make()
+    assert definition.coerce(10) == 10
     for bad in ("10", 10.5, True, None, [1]):
         with pytest.raises(SettingTypeMismatchError):
-            d.coerce(bad)
+            definition.coerce(bad)
     for bad in (2, 21):
         with pytest.raises(SettingOutOfRangeError) as exc:
-            d.coerce(bad)
+            definition.coerce(bad)
         assert exc.value.details["min"] == 3 and exc.value.details["max"] == 20
     boolean = make(key="a.b", type="bool", default=False, min=None, max=None)
     assert boolean.coerce(True) is True

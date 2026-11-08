@@ -31,10 +31,10 @@ const detail = (over: Record<string, unknown> = {}, roles: unknown[] = [{ id: 'r
 function route(handlers: Record<string, unknown>) {
   api.mockImplementation(async (url: string, opts: { method?: string } = {}) => {
     const key = `${opts.method ?? 'GET'} ${url}`
-    const h = handlers[key]
-    if (h === undefined) throw new Error(`sin handler: ${key}`)
-    if (h instanceof Error) throw h
-    return h
+    const handler = handlers[key]
+    if (handler === undefined) throw new Error(`sin handler: ${key}`)
+    if (handler instanceof Error) throw handler
+    return handler
   })
 }
 const base = (over: Record<string, unknown> = {}) => ({
@@ -68,7 +68,7 @@ describe('UsersDetail', () => {
     ]), 'GET /roles/r2': { ...roleWithActions, id: 'r2', application_id: 'a-tau', is_active: false, actions: [] } })
     expect(wrapper.text()).toContain('Luis Mora')
     expect(wrapper.text()).toContain('luis@x.co')
-    expect(wrapper.findAll('[data-testid="role-group"]').map(g => g.text())).toEqual([
+    expect(wrapper.findAll('[data-testid="role-group"]').map(group => group.text())).toEqual([
       expect.stringContaining('Leo'), expect.stringContaining('Taurus')
     ])
     // Cajero está inactivo: no da acceso a Taurus.
@@ -85,7 +85,7 @@ describe('UsersDetail', () => {
 
   it('asignar rol: el selector solo lista roles que no tiene, «Aplicación → Rol»', async () => {
     const wrapper = await mountDetail()
-    const labels = [...wrapper.get('[data-testid="role-select"]').element.querySelectorAll('option')].map(o => o.textContent?.trim())
+    const labels = [...wrapper.get('[data-testid="role-select"]').element.querySelectorAll('option')].map(option => option.textContent?.trim())
     expect(labels).toEqual(['Aplicación → Rol', 'Taurus → Cajero'])
   })
 
@@ -93,7 +93,7 @@ describe('UsersDetail', () => {
     const wrapper = await mountDetail({ 'DELETE /users/u2/roles/r1': detail({}, []) })
     await wrapper.get('[data-testid="role-remove"]').trigger('click')
     await flushPromises()
-    const confirm = [...document.body.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(b => b.textContent?.trim() === 'Quitar rol')!
+    const confirm = [...document.body.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(button => button.textContent?.trim() === 'Quitar rol')!
     confirm.click()
     await flushPromises()
     expect(api).toHaveBeenCalledWith('/users/u2/roles/r1', { method: 'DELETE' })
@@ -105,7 +105,7 @@ describe('UsersDetail', () => {
     await wrapper.get('[data-testid="user-toggle"]').trigger('click')
     await flushPromises()
     expect(document.body.textContent).toContain('cerrarán todas sus sesiones')
-    const confirm = [...document.body.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(b => b.textContent?.trim() === 'Desactivar')!
+    const confirm = [...document.body.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(button => button.textContent?.trim() === 'Desactivar')!
     confirm.click()
     await flushPromises()
     expect(api).toHaveBeenCalledWith('/users/u2/deactivate', { method: 'POST' })
@@ -122,7 +122,7 @@ describe('UsersDetail', () => {
     const wrapper = await mountDetail({ 'POST /users/u2/deactivate': new LeoApiError(409, 'self_deactivation', 'No puedes desactivar tu propio usuario.') })
     await wrapper.get('[data-testid="user-toggle"]').trigger('click')
     await flushPromises()
-    const confirm = [...document.body.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(b => b.textContent?.trim() === 'Desactivar')!
+    const confirm = [...document.body.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(button => button.textContent?.trim() === 'Desactivar')!
     confirm.click()
     await flushPromises()
     expect(document.body.textContent).toContain('No puedes desactivar tu propio usuario')

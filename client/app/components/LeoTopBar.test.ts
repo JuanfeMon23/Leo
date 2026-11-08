@@ -46,7 +46,7 @@ describe('LeoTopBar', () => {
     await toggle.trigger('click')
     const links = wrapper.findAll('a')
     // Cada enlace lleva ahora un avatar con la inicial (aria-hidden): se compara el nombre y la marca "Actual" por separado.
-    expect(links.map(a => a.get('[data-testid="leo-app-name"]').text())).toEqual(['Leo', 'Vladimir'])
+    expect(links.map(link => link.get('[data-testid="leo-app-name"]').text())).toEqual(['Leo', 'Vladimir'])
     expect(links[0]!.text()).toContain('Actual')
     expect(links[1]!.text()).not.toContain('Actual')
     expect(links[1]!.attributes('href')).toBe('http://localhost:3200')

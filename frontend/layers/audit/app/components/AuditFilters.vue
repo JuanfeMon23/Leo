@@ -19,15 +19,15 @@ const props = defineProps<{
 
 const emit = defineEmits<{ search: [], clear: [] }>()
 
-const appOptions = computed(() => props.applications.map(a => ({ value: a.id, label: a.name })))
+const appOptions = computed(() => props.applications.map(application => ({ value: application.id, label: application.name })))
 const userOptions = computed(() =>
-  props.users.map(u => ({ value: u.id, label: `${`${u.first_name} ${u.last_name}`.trim()} (${u.username})` })))
+  props.users.map(user => ({ value: user.id, label: `${`${user.first_name} ${user.last_name}`.trim()} (${user.username})` })))
 
 const selectedApp = computed(() => props.catalog[filters.value.applicationId])
-const moduleOptions = computed(() => (selectedApp.value?.modules ?? []).map(m => ({ value: m.slug, label: m.name })))
+const moduleOptions = computed(() => (selectedApp.value?.modules ?? []).map(module => ({ value: module.slug, label: module.name })))
 const actionOptions = computed(() => {
-  const modules = (selectedApp.value?.modules ?? []).filter(m => !filters.value.module || m.slug === filters.value.module)
-  return modules.flatMap(m => m.actions.map(a => ({ value: a.tag, label: a.name })))
+  const modules = (selectedApp.value?.modules ?? []).filter(module => !filters.value.module || module.slug === filters.value.module)
+  return modules.flatMap(module => module.actions.map(action => ({ value: action.tag, label: action.name })))
 })
 
 const activeCount = computed(() => auditActiveFilterCount(filters.value))

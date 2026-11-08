@@ -8,7 +8,7 @@ export interface ProfilePasswordErrors {
 }
 
 function asStrings(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string' && v.length > 0) : []
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.length > 0) : []
 }
 
 /**
@@ -27,7 +27,7 @@ export function profilePasswordErrors(err: unknown): ProfilePasswordErrors {
     if (err.code === 'weak_password') {
       const missing = asStrings((err.details as { password?: unknown } | null)?.password)
       const message = missing.length
-        ? `La contraseña no cumple la política: ${missing.map(m => m.charAt(0).toLowerCase() + m.slice(1)).join('; ')}.`
+        ? `La contraseña no cumple la política: ${missing.map(requirement => requirement.charAt(0).toLowerCase() + requirement.slice(1)).join('; ')}.`
         : 'La contraseña es débil: no cumple la política de seguridad. Revisa los requisitos.'
       return { fields: { new_password: message }, form: null }
     }

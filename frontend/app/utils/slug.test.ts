@@ -6,11 +6,11 @@ describe('zSlug', () => {
     expect(zSlug('obligatorio').parse(' mi-app ')).toBe('mi-app')
   })
 
-  it.each(['Mi', 'a b', 'a--b', '-a', 'a-', 'a_b'])('rechaza %s', (v) => {
-    const r = zSlug('obligatorio').safeParse(v)
-    expect(r.success).toBe(false)
-    expect(r.error!.issues.map(i => i.message)).toContain(SLUG_MESSAGE)
-    expect(SLUG_REGEX.test(v)).toBe(false)
+  it.each(['Mi', 'a b', 'a--b', '-a', 'a-', 'a_b'])('rechaza %s', (value) => {
+    const result = zSlug('obligatorio').safeParse(value)
+    expect(result.success).toBe(false)
+    expect(result.error!.issues.map(i => i.message)).toContain(SLUG_MESSAGE)
+    expect(SLUG_REGEX.test(value)).toBe(false)
   })
 
   it('obligatorio y máximo 64', () => {

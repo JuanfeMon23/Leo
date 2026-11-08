@@ -40,7 +40,7 @@ describe('middleware leo.global: tope de bucles de login', () => {
     await run(route('/a', { tag: 'x' }))
     await run(route('/a', { tag: 'x' }))
     navigateToMock.mockClear()
-    const blocked = await run(route('/a', { tag: 'x' })).catch((e: unknown) => e)
+    const blocked = await run(route('/a', { tag: 'x' })).catch((error: unknown) => error)
     expect(navigateToMock).not.toHaveBeenCalled()
     expect(blocked).toMatchObject({ statusCode: 401, statusMessage: 'No pudimos iniciar tu sesión. Cierra la pestaña e inténtalo de nuevo.' })
     loginLoopGuard.reset()

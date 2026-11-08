@@ -72,9 +72,14 @@ async def world(session, client):
     class World:
         pass
 
-    w = World()
-    w.session, w.client, w.caller, w.provisioner = session, client, caller, provisioner
-    return w
+    world = World()
+    world.session, world.client, world.caller, world.provisioner = (
+        session,
+        client,
+        caller,
+        provisioner,
+    )
+    return world
 
 
 async def bearer(world, creds=None, audience="leo") -> dict[str, str]:
@@ -139,7 +144,9 @@ async def test_semilla_acuarius_y_rol_paciente(world):
     )
     assert tags == PATIENT_TAGS
     assert PATIENT_TAGS == {
-        f"acuarius.{m}.{v}" for m, (_, verbs) in ACUARIUS_MODULES.items() for v in verbs
+        f"acuarius.{module}.{verb}"
+        for module, (_, verbs) in ACUARIUS_MODULES.items()
+        for verb in verbs
     }
 
 

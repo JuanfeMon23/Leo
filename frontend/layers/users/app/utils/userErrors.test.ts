@@ -32,9 +32,9 @@ describe('mapeo de errores del backend a campos (mapApiErrorToForm)', () => {
 
   it('correo duplicado → campo email, mensaje legible', () => {
     const err = new LeoApiError(409, 'duplicate', 'Ya existe un usuario con el email «a@x.co».', { email: 'a@x.co' })
-    const r = mapApiErrorToForm(err, { fields })
-    expect(r.fieldErrors.email).toContain('Ya existe un usuario con el email')
-    expect(r.formError).toBeNull()
+    const result = mapApiErrorToForm(err, { fields })
+    expect(result.fieldErrors.email).toContain('Ya existe un usuario con el email')
+    expect(result.formError).toBeNull()
   })
 
   it('documento duplicado → campo document_number', () => {

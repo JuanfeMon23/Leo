@@ -47,8 +47,8 @@ async def _sqlstate(conn: asyncpg.Connection, role: str, sql: str) -> str | None
 async def roles_db() -> AsyncGenerator[asyncpg.Connection]:
     admin = await asyncpg.connect(ADMIN_DSN)
     existing = {
-        r["rolname"]
-        for r in await admin.fetch(
+        row["rolname"]
+        for row in await admin.fetch(
             "SELECT rolname FROM pg_roles WHERE rolname IN ('leo_app', 'leo_migrator')"
         )
     }
@@ -108,8 +108,8 @@ async def test_leo_app_no_tiene_privilegios_de_rol(roles_db) -> None:
 
 async def test_leo_migrator_es_duenio_del_esquema_y_las_tablas(roles_db) -> None:
     owners = {
-        r["tableowner"]
-        for r in await roles_db.fetch(
+        row["tableowner"]
+        for row in await roles_db.fetch(
             "SELECT tableowner FROM pg_tables WHERE schemaname = 'public'"
         )
     }

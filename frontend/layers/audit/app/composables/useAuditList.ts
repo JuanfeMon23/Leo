@@ -54,7 +54,7 @@ export function useAuditList() {
       if (mine !== ticket) return
       items.value = result.items
       total.value = result.total
-      void Promise.all([...new Set(result.items.map(e => e.application_id))].map(ensureApplication))
+      void Promise.all([...new Set(result.items.map(auditEvent => auditEvent.application_id))].map(ensureApplication))
     } catch (err) {
       if (mine !== ticket) return
       error.value = leoErrorMessage(err)

@@ -76,7 +76,11 @@ class InMemoryReplayStore:
     async def add_if_new(self, key: str, ttl_seconds: float) -> bool:
         now = self._clock()
         if len(self._seen) >= self._max:
-            self._seen = {k: e for k, e in self._seen.items() if e > now}
+            self._seen = {
+                key: expires_at
+                for key, expires_at in self._seen.items()
+                if expires_at > now
+            }
         expires = self._seen.get(key)
         if expires is not None and expires > now:
             return False
@@ -114,15 +118,17 @@ def _public_key(jwk: object) -> ec.EllipticCurvePublicKey:
     if jwk.get("kty") != "EC" or jwk.get("crv") != "P-256":
         raise DpopError("el jwk no es EC P-256")
     try:
-        x = b64url_decode(jwk.get("x", ""))
-        y = b64url_decode(jwk.get("y", ""))
+        x_coordinate = b64url_decode(jwk.get("x", ""))
+        y_coordinate = b64url_decode(jwk.get("y", ""))
     except ValueError as exc:
         raise DpopError("coordenadas del jwk invalidas") from exc
-    if len(x) != _COORD_BYTES or len(y) != _COORD_BYTES:
+    if len(x_coordinate) != _COORD_BYTES or len(y_coordinate) != _COORD_BYTES:
         raise DpopError("coordenadas del jwk invalidas")
     try:
         return ec.EllipticCurvePublicNumbers(
-            int.from_bytes(x, "big"), int.from_bytes(y, "big"), ec.SECP256R1()
+            int.from_bytes(x_coordinate, "big"),
+            int.from_bytes(y_coordinate, "big"),
+            ec.SECP256R1(),
         ).public_key()
     except ValueError as exc:
         raise DpopError("el jwk no es un punto valido de P-256") from exc

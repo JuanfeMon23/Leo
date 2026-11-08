@@ -15,9 +15,9 @@ const props = defineProps<{ event: AuditEventRead | null, catalog: AuditCatalog 
 const entity = computed(() => (props.event ? auditEntityLabel(props.event) : null))
 const actionName = computed(() => (props.event ? auditActionName(props.catalog, props.event.application_id, props.event.action_tag) : ''))
 const description = computed(() => {
-  const e = props.event
-  if (!e) return undefined
-  return `${auditApplicationName(props.catalog, e.application_id)} → ${auditModuleName(props.catalog, e.application_id, e.module)}`
+  const auditEvent = props.event
+  if (!auditEvent) return undefined
+  return `${auditApplicationName(props.catalog, auditEvent.application_id)} → ${auditModuleName(props.catalog, auditEvent.application_id, auditEvent.module)}`
 })
 </script>
 

@@ -55,7 +55,9 @@ async def events(session, tag, **filters):
 async def reload(session, user):
     return (
         await session.scalars(
-            select(User).where(User.id == user.id).execution_options(populate_existing=True)
+            select(User)
+            .where(User.id == user.id)
+            .execution_options(populate_existing=True)
         )
     ).one()
 
@@ -119,11 +121,17 @@ class World:
             PROFILE, json={"user_access_token": token, **fields}, headers=headers
         )
 
-    async def password(self, token, current=STRONG_PASSWORD, new=NEW_PASSWORD, headers=None):
+    async def password(
+        self, token, current=STRONG_PASSWORD, new=NEW_PASSWORD, headers=None
+    ):
         headers = headers if headers is not None else await self.service_headers()
         return await self.client.post(
             PASSWORD,
-            json={"user_access_token": token, "current_password": current, "new_password": new},
+            json={
+                "user_access_token": token,
+                "current_password": current,
+                "new_password": new,
+            },
             headers=headers,
         )
 
@@ -139,17 +147,19 @@ async def world(session, make_browser, client):
     leo = await leo_app(session)
     conn = await session.connection()
     await conn.run_sync(lambda sync: seed_leo_delegate_role(sync, leo.id))
-    w = World(session, make_browser, client)
-    w.caller = await make_client_app(session, slug="acu", tags=["items.view"])
-    w.app_role = await make_role(session, w.caller.app.id, ["acu.items.view"])
-    w.delegate = (
+    world = World(session, make_browser, client)
+    world.caller = await make_client_app(session, slug="acu", tags=["items.view"])
+    world.app_role = await make_role(session, world.caller.app.id, ["acu.items.view"])
+    world.delegate = (
         await session.scalars(
-            select(Role).where(Role.application_id == leo.id, Role.slug == LEO_DELEGATE_ROLE_SLUG)
+            select(Role).where(
+                Role.application_id == leo.id, Role.slug == LEO_DELEGATE_ROLE_SLUG
+            )
         )
     ).one()
-    await grant_service_access(session, w.caller.app, w.delegate)
+    await grant_service_access(session, world.caller.app, world.delegate)
     await session.commit()
-    return w
+    return world
 
 
 # --- semilla y concesion ---
@@ -157,9 +167,13 @@ async def world(session, make_browser, client):
 
 async def test_rol_delegado_solo_tiene_la_accion_y_semilla_idempotente(world):
     conn = await world.session.connection()
-    await conn.run_sync(lambda sync: seed_leo_delegate_role(sync, world.delegate.application_id))
+    await conn.run_sync(
+        lambda sync: seed_leo_delegate_role(sync, world.delegate.application_id)
+    )
     roles = (
-        await world.session.scalars(select(Role).where(Role.slug == LEO_DELEGATE_ROLE_SLUG))
+        await world.session.scalars(
+            select(Role).where(Role.slug == LEO_DELEGATE_ROLE_SLUG)
+        )
     ).all()
     assert len(roles) == 1
     tags = set(
@@ -232,7 +246,9 @@ async def test_cambiar_correo_sin_contrasena_422(world):
 async def test_correo_con_contrasena_incorrecta_403_y_evento_denied(world):
     user = await world.patient()
     token, _ = await world.user_token(user)
-    response = await world.profile(token, email="nuevo@example.com", current_password=WRONG)
+    response = await world.profile(
+        token, email="nuevo@example.com", current_password=WRONG
+    )
     assert response.status_code == 403
     assert response.json()["code"] == "invalid_current_password"
     [event] = await events(world.session, "leo.users.edit", result="denied")
@@ -258,18 +274,22 @@ async def test_correo_con_contrasena_correcta_cambia_y_cierra_otras_sesiones(wor
     assert response.status_code == 200, response.text
     assert response.json()["email"] == "nuevo@example.com"
     alive = {
-        s.id: s.revoked_reason
-        for s in await world.session.scalars(
+        auth_session.id: auth_session.revoked_reason
+        for auth_session in await world.session.scalars(
             select(Session)
             .where(Session.user_id == user.id)
             .execution_options(populate_existing=True)
         )
     }
-    reasons = sorted(str(r) for r in alive.values())
-    assert sum(r is None for r in alive.values()) == 1  # la del token sigue viva
+    reasons = sorted(str(reply) for reply in alive.values())
+    assert (
+        sum(reply is None for reply in alive.values()) == 1
+    )  # la del token sigue viva
     assert SessionRevokedReason.EMAIL_CHANGE in alive.values()
     assert len(reasons) == 2
-    [event] = await events(world.session, "leo.users.edit", result="ok", actor_user_id=user.id)
+    [event] = await events(
+        world.session, "leo.users.edit", result="ok", actor_user_id=user.id
+    )
     assert "via=servicio:acu" in event.reason
 
 
@@ -288,7 +308,9 @@ async def test_correo_duplicado_409(world):
 # --- contrasena ---
 
 
-async def test_cambia_contrasena_204_cierra_otras_sesiones_y_audita(world, make_browser):
+async def test_cambia_contrasena_204_cierra_otras_sesiones_y_audita(
+    world, make_browser
+):
     user = await world.patient()
     token, _ = await world.user_token(user)
     await world.user_token(user)  # segunda sesion
@@ -304,16 +326,25 @@ async def test_cambia_contrasena_204_cierra_otras_sesiones_y_audita(world, make_
             .execution_options(populate_existing=True)
         )
     )
-    assert sum(s.revoked_at is None for s in states) == 1
-    assert any(s.revoked_reason == SessionRevokedReason.PASSWORD_CHANGE for s in states)
+    assert sum(auth_session.revoked_at is None for auth_session in states) == 1
+    assert any(
+        auth_session.revoked_reason == SessionRevokedReason.PASSWORD_CHANGE
+        for auth_session in states
+    )
     login = await make_browser().login(user.username, NEW_PASSWORD)
     assert login.status_code == 200
-    assert (await make_browser().login(user.username, STRONG_PASSWORD)).status_code == 401
+    assert (
+        await make_browser().login(user.username, STRONG_PASSWORD)
+    ).status_code == 401
     [event] = await events(world.session, "leo.users.reset-password", result="ok")
     assert event.actor_user_id == user.id
     assert "via=servicio:acu" in event.reason
     dump = str(event.__dict__)
-    assert NEW_PASSWORD not in dump and STRONG_PASSWORD not in dump and "argon2" not in dump
+    assert (
+        NEW_PASSWORD not in dump
+        and STRONG_PASSWORD not in dump
+        and "argon2" not in dump
+    )
 
 
 async def test_contrasena_actual_incorrecta_401_y_evento_denied(world):
@@ -344,7 +375,9 @@ async def test_fallos_por_la_via_delegada_bloquean_tambien_la_cookie_429(world):
     headers = await world.service_headers()
 
     for _ in range(5):  # LEO_LOGIN_MAX_FAILED_ATTEMPTS en los tests
-        assert (await world.password(token, current=WRONG, headers=headers)).status_code == 401
+        assert (
+            await world.password(token, current=WRONG, headers=headers)
+        ).status_code == 401
     blocked = await world.password(token, headers=headers)
     cookie = await nav.post(
         "/api/v1/auth/me/password",
@@ -362,10 +395,10 @@ async def test_fallos_de_correo_delegados_comparten_bloqueo_con_la_contrasena(wo
     token, _ = await world.user_token(user)
     headers = await world.service_headers()
     for _ in range(5):
-        r = await world.profile(
+        reply = await world.profile(
             token, headers=headers, email="x@example.com", current_password=WRONG
         )
-        assert r.status_code == 403
+        assert reply.status_code == 403
     assert (await world.password(token, headers=headers)).status_code == 429
 
 
@@ -381,13 +414,13 @@ async def test_usuario_con_permisos_leo_rechazado_403_generico_y_denied(world):
     response = await world.profile(token, first_name="Hackeado")
     pw = await world.password(token)
 
-    for r in (response, pw):
-        assert r.status_code == 403
-        assert r.json()["code"] == "forbidden"
+    for reply in (response, pw):
+        assert reply.status_code == 403
+        assert reply.json()["code"] == "forbidden"
     assert (await reload(world.session, user)).first_name == user.first_name
     denied = await events(world.session, TAG, result="denied")
     assert len(denied) == 2
-    assert all(e.actor_user_id == user.id for e in denied)
+    assert all(event.actor_user_id == user.id for event in denied)
 
 
 async def test_usuario_con_rol_de_leo_sin_acciones_tambien_rechazado(world):
@@ -460,7 +493,9 @@ async def test_sin_el_tag_de_servicio_403(world):
     await conn.run_sync(lambda sync: seed_leo_provisioner_role(sync, leo.id))
     provisioner = (
         await world.session.scalars(
-            select(Role).where(Role.application_id == leo.id, Role.slug == "leo-patient-provisioner")
+            select(Role).where(
+                Role.application_id == leo.id, Role.slug == "leo-patient-provisioner"
+            )
         )
     ).one()
     await grant_service_access(world.session, caller.app, provisioner)
@@ -481,7 +516,9 @@ async def test_sin_bearer_o_con_bearer_invalido_401(world):
     token, nav = await world.user_token(user)
     body = {"user_access_token": token, "first_name": "X"}
     assert (await world.client.patch(PROFILE, json=body)).status_code == 401
-    bad = await world.client.patch(PROFILE, json=body, headers={"Authorization": "Bearer nope"})
+    bad = await world.client.patch(
+        PROFILE, json=body, headers={"Authorization": "Bearer nope"}
+    )
     assert bad.status_code == 401
     assert bad.headers["WWW-Authenticate"] == "Bearer"
     # La cookie de sesion del usuario tampoco sirve en esta ruta.
@@ -495,14 +532,18 @@ async def test_nunca_acepta_user_id_del_cliente(world):
     token, _ = await world.user_token(user)
     headers = await world.service_headers()
 
-    for extra in ({"user_id": str(victim.id)}, {"username": victim.username}, {"id": str(victim.id)}):
-        r = await world.client.patch(
+    for extra in (
+        {"user_id": str(victim.id)},
+        {"username": victim.username},
+        {"id": str(victim.id)},
+    ):
+        reply = await world.client.patch(
             PROFILE,
             json={"user_access_token": token, "first_name": "Hack", **extra},
             headers=headers,
         )
-        assert r.status_code == 422
-    r = await world.client.post(
+        assert reply.status_code == 422
+    reply = await world.client.post(
         PASSWORD,
         json={
             "user_access_token": token,
@@ -512,31 +553,31 @@ async def test_nunca_acepta_user_id_del_cliente(world):
         },
         headers=headers,
     )
-    assert r.status_code == 422
+    assert reply.status_code == 422
     assert (await reload(world.session, victim)).first_name == "Victima"
     assert (await reload(world.session, user)).first_name == user.first_name
 
 
 async def test_el_token_de_un_usuario_solo_edita_a_ese_usuario(world):
-    a = await world.patient(first_name="A")
-    b = await world.patient(first_name="B")
-    token_a, _ = await world.user_token(a)
-    await world.user_token(b)
+    first_patient = await world.patient(first_name="A")
+    second_patient = await world.patient(first_name="B")
+    token_a, _ = await world.user_token(first_patient)
+    await world.user_token(second_patient)
     response = await world.profile(token_a, first_name="Nuevo")
-    assert response.json()["username"] == a.username
-    assert (await reload(world.session, b)).first_name == "B"
+    assert response.json()["username"] == first_patient.username
+    assert (await reload(world.session, second_patient)).first_name == "B"
 
 
 async def test_cuerpo_invalido_422_sin_eco_de_contrasenas(world):
     user = await world.patient()
     token, _ = await world.user_token(user)
-    r = await world.client.post(
+    reply = await world.client.post(
         PASSWORD,
         json={"user_access_token": token, "current_password": STRONG_PASSWORD},
         headers=await world.service_headers(),
     )
-    assert r.status_code == 422
-    assert STRONG_PASSWORD not in r.text
+    assert reply.status_code == 422
+    assert STRONG_PASSWORD not in reply.text
 
 
 # --- rate limit ---
@@ -548,7 +589,10 @@ async def test_rate_limit_por_app_llamadora_429(world):
     await set_setting(world.session, "rate_limit.delegated_app_per_window", 10)
     headers = await world.service_headers()
 
-    codes = [(await world.profile(token, headers=headers, first_name="Z")).status_code for _ in range(11)]
+    codes = [
+        (await world.profile(token, headers=headers, first_name="Z")).status_code
+        for _ in range(11)
+    ]
 
     assert codes == [200] * 10 + [429]
     last = await world.profile(token, headers=headers, first_name="Z")
@@ -556,15 +600,17 @@ async def test_rate_limit_por_app_llamadora_429(world):
 
 
 async def test_rate_limit_por_usuario_429_sin_afectar_a_otro(world):
-    a = await world.patient()
-    b = await world.patient()
-    token_a, _ = await world.user_token(a)
-    token_b, _ = await world.user_token(b)
+    first_patient = await world.patient()
+    second_patient = await world.patient()
+    token_a, _ = await world.user_token(first_patient)
+    token_b, _ = await world.user_token(second_patient)
     await set_setting(world.session, "rate_limit.delegated_user_per_window", 10)
     headers = await world.service_headers()
 
     for _ in range(10):
-        assert (await world.profile(token_a, headers=headers, first_name="Z")).status_code == 200
+        assert (
+            await world.profile(token_a, headers=headers, first_name="Z")
+        ).status_code == 200
     limited = await world.profile(token_a, headers=headers, first_name="Y")
     assert limited.status_code == 429
     assert int(limited.headers["Retry-After"]) >= 1

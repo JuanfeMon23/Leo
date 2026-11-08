@@ -36,11 +36,11 @@ describe('ruta y menú de ajustes', () => {
   it('el menú muestra «Ajustes» solo con leo.settings.view', async () => {
     signInWith(['leo.settings.view'])
     const withTag = await mountSuspended(DefaultLayout)
-    expect(withTag.findAll('a').find(a => a.text().includes('Ajustes'))?.attributes('href')).toBe('/ajustes')
+    expect(withTag.findAll('a').find(link => link.text().includes('Ajustes'))?.attributes('href')).toBe('/ajustes')
 
     signInWith(['leo.settings.edit', 'leo.users.view'])
     const without = await mountSuspended(DefaultLayout)
-    expect(without.findAll('a').some(a => a.text().includes('Ajustes'))).toBe(false)
+    expect(without.findAll('a').some(link => link.text().includes('Ajustes'))).toBe(false)
   })
 
   it('registra nombres legibles de los 3 permisos', () => {

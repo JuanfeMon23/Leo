@@ -31,8 +31,8 @@ export function isCacheFresh(stamp: CacheStamp, ttl: number): boolean {
 /** Clave estable de un recurso + parámetros: ignora `undefined`/`null`/`''` y el orden de las claves. */
 export function cacheKey(resource: string, params: Record<string, unknown> = {}): string {
   const entries = Object.entries(params)
-    .filter(([, v]) => v !== undefined && v !== null && v !== '')
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .sort(([leftKey], [rightKey]) => (leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0))
   if (!entries.length) return resource
   return `${resource}?${JSON.stringify(Object.fromEntries(entries))}`
 }

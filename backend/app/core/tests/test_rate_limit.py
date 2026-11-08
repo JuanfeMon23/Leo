@@ -113,25 +113,30 @@ async def test_concurrencia_no_deja_pasar_mas_del_limite(limiter_factory) -> Non
     now = clock.now()
     waits = await asyncio.gather(*(limiter.check_and_hit("k", now) for _ in range(40)))
     assert waits.count(0) == 5
-    assert all(w > 0 for w in waits if w)
+    assert all(wait > 0 for wait in waits if wait)
 
 
 async def test_dos_procesos_comparten_el_conteo(pg_engine: AsyncEngine) -> None:
     """Dos almacenes con motores propios (como dos procesos) cuentan juntos."""
     other = create_async_engine(TEST_URL, poolclass=pool.NullPool)
     bucket = f"test-{uuid4().hex[:12]}"
-    a = SlidingWindowLimiter(
+    first_limiter = SlidingWindowLimiter(
         3, 60, bucket=bucket, store=PostgresRateLimitStore(pg_engine)
     )
-    b = SlidingWindowLimiter(3, 60, bucket=bucket, store=PostgresRateLimitStore(other))
+    second_limiter = SlidingWindowLimiter(
+        3, 60, bucket=bucket, store=PostgresRateLimitStore(other)
+    )
     try:
         now = clock.now()
         waits = await asyncio.gather(
-            *(limiter.check_and_hit("ip", now) for limiter in [a, b] * 5)
+            *(
+                limiter.check_and_hit("ip", now)
+                for limiter in [first_limiter, second_limiter] * 5
+            )
         )
         assert waits.count(0) == 3
     finally:
-        await a.reset()
+        await first_limiter.reset()
         await other.dispose()
 
 

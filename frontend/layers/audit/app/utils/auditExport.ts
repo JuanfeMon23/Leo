@@ -1,6 +1,6 @@
 import type { AuditFiltersState } from '../types/audit'
 
-const pad = (n: number) => String(n).padStart(2, '0')
+const pad = (value: number) => String(value).padStart(2, '0')
 
 /** `auditoria-AAAA-MM-DD.csv`, o con el rango filtrado (`auditoria-2026-10-01_a_2026-10-15.csv`). */
 export function auditExportFilename(filters: Pick<AuditFiltersState, 'dateFrom' | 'dateTo'>, now: Date = new Date()): string {

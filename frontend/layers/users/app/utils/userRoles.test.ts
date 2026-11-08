@@ -16,18 +16,18 @@ describe('usersGroupRolesByApp', () => {
       [role('r1', 'a-tau', 'Cajero'), role('r2', 'a-leo', 'Soporte'), role('r3', 'a-leo', 'Administrador')],
       apps
     )
-    expect(groups.map(g => g.applicationName)).toEqual(['Leo', 'Taurus'])
-    expect(groups[0]!.roles.map(r => r.name)).toEqual(['Administrador', 'Soporte'])
+    expect(groups.map(group => group.applicationName)).toEqual(['Leo', 'Taurus'])
+    expect(groups[0]!.roles.map(userRole => userRole.name)).toEqual(['Administrador', 'Soporte'])
   })
 
   it('hasAccess solo con ≥1 rol activo en la app', () => {
     const groups = usersGroupRolesByApp([role('r1', 'a-leo', 'A', false), role('r2', 'a-tau', 'B', true)], apps)
-    expect(Object.fromEntries(groups.map(g => [g.applicationName, g.hasAccess]))).toEqual({ Leo: false, Taurus: true })
+    expect(Object.fromEntries(groups.map(group => [group.applicationName, group.hasAccess]))).toEqual({ Leo: false, Taurus: true })
   })
 
   it('una app desconocida se nombra «Aplicación desconocida»', () => {
-    const [g] = usersGroupRolesByApp([role('r1', 'zzz', 'X')], apps)
-    expect(g!.applicationName).toBe('Aplicación desconocida')
+    const [group] = usersGroupRolesByApp([role('r1', 'zzz', 'X')], apps)
+    expect(group!.applicationName).toBe('Aplicación desconocida')
   })
 
   it('sin roles → sin grupos', () => {
@@ -55,7 +55,7 @@ describe('usersRoleOptions', () => {
   })
   it('ordenadas por aplicación y luego por rol', () => {
     const more = [...all, { id: 'r5', application_id: 'a-leo', slug: 's', name: 'Soporte', is_active: true }]
-    expect(usersRoleOptions(more, apps, new Set()).map(o => o.label)).toEqual(['Leo → Administrador', 'Leo → Soporte', 'Taurus → Cajero'])
+    expect(usersRoleOptions(more, apps, new Set()).map(option => option.label)).toEqual(['Leo → Administrador', 'Leo → Soporte', 'Taurus → Cajero'])
   })
 })
 

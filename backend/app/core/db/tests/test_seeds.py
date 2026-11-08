@@ -235,7 +235,7 @@ async def test_semilla_registra_los_tags_de_evento_auditados(
         ),
         {"role": LEO_ADMIN_ROLE_SLUG, "tags": list(EVENT_TAGS)},
     )
-    assert {r[0] for r in rows} == EVENT_TAGS
+    assert {row[0] for row in rows} == EVENT_TAGS
 
 
 async def test_semilla_agrega_acciones_nuevas_del_catalogo_sin_duplicar(
@@ -245,7 +245,14 @@ async def test_semilla_agrega_acciones_nuevas_del_catalogo_sin_duplicar(
     (y su asignacion a `leo-admin`) al volver a correr la semilla."""
     settings = _settings()
     old_catalog = {
-        module: (name, {v: d for v, d in verbs.items() if v != "login"})
+        module: (
+            name,
+            {
+                verb: description
+                for verb, description in verbs.items()
+                if verb != "login"
+            },
+        )
         for module, (name, verbs) in LEO_MODULES.items()
     }
     monkeypatch.setattr("app.core.db.seeds.leo_app.LEO_MODULES", old_catalog)
@@ -287,9 +294,9 @@ async def test_semilla_agrega_las_acciones_de_servicio_sin_duplicar(
         module: (
             name,
             {
-                v: d
-                for v, d in verbs.items()
-                if v not in ("grant-service-access", "service-token")
+                verb: description
+                for verb, description in verbs.items()
+                if verb not in ("grant-service-access", "service-token")
             },
         )
         for module, (name, verbs) in LEO_MODULES.items()
@@ -329,7 +336,7 @@ async def test_acciones_de_servicio_tienen_nombre_y_modulo_correctos(
             {"tags": [GRANT_TAG, SERVICE_TOKEN_TAG]},
         )
     ).all()
-    by_tag = {r.tag: r for r in rows}
+    by_tag = {row.tag: row for row in rows}
     assert by_tag[GRANT_TAG].name == "Conceder acceso entre aplicaciones"
     assert by_tag[GRANT_TAG].slug == "applications"
     assert not by_tag[GRANT_TAG].description.startswith("Evento:")

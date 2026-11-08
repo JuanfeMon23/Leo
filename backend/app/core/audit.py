@@ -32,10 +32,10 @@ def json_safe(value: Any) -> Any:
     if isinstance(value, datetime | date):
         return value.isoformat()
     if isinstance(value, list | tuple | set | frozenset):
-        items = [json_safe(v) for v in value]
+        items = [json_safe(item) for item in value]
         return sorted(items, key=str) if isinstance(value, set | frozenset) else items
     if isinstance(value, dict):
-        return {str(k): json_safe(v) for k, v in value.items()}
+        return {str(key): json_safe(item) for key, item in value.items()}
     return value
 
 

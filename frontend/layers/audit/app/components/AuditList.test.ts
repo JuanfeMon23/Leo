@@ -36,15 +36,15 @@ function route(events: unknown[], over: Record<string, unknown> = {}) {
     ...over
   }
   api.mockImplementation(async (url: string) => {
-    const h = handlers[url]
-    if (h === undefined) throw new Error(`sin handler: ${url}`)
-    if (h instanceof Error) throw h
-    return h
+    const handler = handlers[url]
+    if (handler === undefined) throw new Error(`sin handler: ${url}`)
+    if (handler instanceof Error) throw handler
+    return handler
   })
 }
 /** Filas del cuerpo de la tabla (sin la cabecera). */
-const bodyRows = (w: VueWrapper) => w.findAll('tr').slice(1)
-const eventCalls = () => api.mock.calls.filter(c => c[0] === '/audit/events')
+const bodyRows = (wrapper: VueWrapper) => wrapper.findAll('tr').slice(1)
+const eventCalls = () => api.mock.calls.filter(call => call[0] === '/audit/events')
 
 beforeEach(() => {
   api.mockReset()
@@ -104,9 +104,9 @@ describe('AuditList', () => {
     expect(wrapper.get('[data-testid="filter-module"]').attributes('disabled')).toBeDefined()
     await wrapper.get('[data-testid="filter-app"]').setValue('a-leo')
     await flushPromises()
-    const modules = wrapper.get('[data-testid="filter-module"]').findAll('option').map(o => o.text())
+    const modules = wrapper.get('[data-testid="filter-module"]').findAll('option').map(option => option.text())
     expect(modules).toContain('Usuarios')
-    const actions = wrapper.get('[data-testid="filter-action"]').findAll('option').map(o => o.text())
+    const actions = wrapper.get('[data-testid="filter-action"]').findAll('option').map(option => option.text())
     expect(actions).toEqual(expect.arrayContaining(['Editar usuario', 'Consultar usuarios']))
     await wrapper.get('[data-testid="filter-action"]').setValue('leo.users.edit')
     await wrapper.get('[data-testid="audit-filters"]').trigger('submit')
@@ -133,7 +133,7 @@ describe('AuditList', () => {
     expect(detail.textContent).toContain('19/10/2026 14:05:09')
     const rows = [...detail.querySelectorAll('[data-testid="diff-row"]')]
     expect(rows).toHaveLength(2)
-    const nombres = rows.find(r => r.getAttribute('data-kind') === 'changed' && r.textContent?.includes('Nombres'))!
+    const nombres = rows.find(row => row.getAttribute('data-kind') === 'changed' && row.textContent?.includes('Nombres'))!
     expect(nombres.querySelector('[data-testid="diff-before"]')!.textContent).toContain('Ana')
     expect(nombres.querySelector('[data-testid="diff-after"]')!.textContent).toContain('Ana María')
     expect(detail.textContent).not.toContain('"x"')

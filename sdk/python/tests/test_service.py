@@ -157,9 +157,9 @@ async def test_token_is_cached_until_margin_before_expiry(
 
 async def test_cache_is_per_audience(provider_parts, leo: FakeLeo) -> None:
     provider, _ = provider_parts
-    a = await provider.token("one")
-    b = await provider.token("two")
-    assert a != b and len(leo.exchanges) == 2
+    first_token = await provider.token("one")
+    second_token = await provider.token("two")
+    assert first_token != second_token and len(leo.exchanges) == 2
 
 
 async def test_short_lived_token_still_cached_with_half_life(
@@ -331,8 +331,8 @@ async def test_auth_reuses_cached_token_across_requests(
 @pytest_asyncio.fixture
 async def audience(leo: FakeLeo) -> AsyncGenerator[tuple[LeoAuth, FastAPI]]:
     http = httpx.AsyncClient(transport=httpx.MockTransport(leo.handle))
-    s = settings("app")
-    auth = LeoAuth(s, client=LeoClient(s, http=http))
+    service_settings = settings("app")
+    auth = LeoAuth(service_settings, client=LeoClient(service_settings, http=http))
     app = FastAPI()
     auth.install(app)
     app.include_router(leo_router(auth))
@@ -371,7 +371,7 @@ def call(app: FastAPI, method: str, path: str, **kw: Any):
     if cookies:
         kw["headers"] = {
             **kw.get("headers", {}),
-            "Cookie": "; ".join(f"{k}={v}" for k, v in cookies.items()),
+            "Cookie": "; ".join(f"{name}={value}" for name, value in cookies.items()),
         }
 
     async def run() -> httpx.Response:

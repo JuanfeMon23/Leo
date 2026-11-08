@@ -64,12 +64,12 @@ async def accessible_applications(
 
 
 def list_statement(
-    application_id: UUID | None, q: str | None, active: bool | None
+    application_id: UUID | None, search_text: str | None, active: bool | None
 ) -> Select:
     stmt = select(Role)
     if application_id is not None:
         stmt = stmt.where(Role.application_id == application_id)
-    stmt = search(stmt, q, Role.slug, Role.name, Role.description)
+    stmt = search(stmt, search_text, Role.slug, Role.name, Role.description)
     return only_active(stmt, active, Role.is_active)
 
 
@@ -107,7 +107,7 @@ async def actions_with_module_of_role(
         .where(RoleAction.role_id == role_id)
         .order_by(AppModule.slug, Action.name)
     )
-    return [(a, m) for a, m in (await session.execute(stmt)).all()]
+    return [(action, module) for action, module in (await session.execute(stmt)).all()]
 
 
 async def actions_by_id(
@@ -116,7 +116,7 @@ async def actions_by_id(
     if not action_ids:
         return {}
     rows = await session.scalars(select(Action).where(Action.id.in_(action_ids)))
-    return {a.id: a for a in rows}
+    return {application.id: application for application in rows}
 
 
 async def remove_role_action(
@@ -134,7 +134,7 @@ async def roles_by_id(session: AsyncSession, role_ids: list[UUID]) -> dict[UUID,
     if not role_ids:
         return {}
     rows = await session.scalars(select(Role).where(Role.id.in_(role_ids)))
-    return {r.id: r for r in rows}
+    return {role.id: role for role in rows}
 
 
 # --- acceso entre servicios (service_grants) ---
@@ -150,7 +150,7 @@ async def applications_by_id(
     if not app_ids:
         return {}
     rows = await session.scalars(select(Application).where(Application.id.in_(app_ids)))
-    return {a.id: a for a in rows}
+    return {application.id: application for application in rows}
 
 
 async def service_grants_of_caller(
@@ -164,7 +164,10 @@ async def service_grants_of_caller(
         .order_by(Application.slug, Role.slug)
         .execution_options(populate_existing=True)
     )
-    return [(g, r, a) for g, r, a in (await session.execute(stmt)).all()]
+    return [
+        (grant, role, application)
+        for grant, role, application in (await session.execute(stmt)).all()
+    ]
 
 
 async def actions_with_module_of_roles(
@@ -179,7 +182,10 @@ async def actions_with_module_of_roles(
         .where(RoleAction.role_id.in_(role_ids))
         .order_by(AppModule.slug, Action.name)
     )
-    return [(rid, a, m) for rid, a, m in (await session.execute(stmt)).all()]
+    return [
+        (rid, action, module)
+        for rid, action, module in (await session.execute(stmt)).all()
+    ]
 
 
 async def remove_service_grant(
@@ -204,7 +210,10 @@ async def service_callers_of_role(
         .order_by(Application.slug)
         .execution_options(populate_existing=True)
     )
-    return [(g, a) for g, a in (await session.execute(stmt)).all()]
+    return [
+        (grant, application)
+        for grant, application in (await session.execute(stmt)).all()
+    ]
 
 
 def _active_granted_roles(caller_id: UUID, audience_id: UUID) -> Select:

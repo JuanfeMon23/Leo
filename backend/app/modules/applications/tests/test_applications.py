@@ -49,7 +49,7 @@ async def test_crear_app_devuelve_el_secreto_una_sola_vez(session, admin, client
     event = await last_event(session, "leo.applications.create", app["id"])
     assert event.actor_user_id == admin.user.id
     assert event.changes["slug"] == {"before": None, "after": "vladimir"}
-    assert not any("secret" in k or "hash" in k for k in event.changes)
+    assert not any("secret" in key or "hash" in key for key in event.changes)
 
 
 async def test_slug_duplicado_409_legible(admin):
@@ -164,13 +164,15 @@ async def test_modulos_y_acciones_arman_el_tag(session, admin):
 
 
 async def test_modulo_de_otra_app_404(admin):
-    a = (await admin.post(APPS, json=new_app("app-a"))).json()["application"]
-    b = (await admin.post(APPS, json=new_app("app-b"))).json()["application"]
+    first_app = (await admin.post(APPS, json=new_app("app-a"))).json()["application"]
+    second_app = (await admin.post(APPS, json=new_app("app-b"))).json()["application"]
     module = (
-        await admin.post(f"{APPS}/{a['id']}/modules", json={"slug": "m", "name": "M"})
+        await admin.post(
+            f"{APPS}/{first_app['id']}/modules", json={"slug": "m", "name": "M"}
+        )
     ).json()
     response = await admin.patch(
-        f"{APPS}/{b['id']}/modules/{module['id']}", json={"name": "X"}
+        f"{APPS}/{second_app['id']}/modules/{module['id']}", json={"name": "X"}
     )
     assert response.status_code == 404
 
@@ -225,7 +227,7 @@ async def test_catalogo_se_sincroniza_y_es_idempotente(session, client):
         "vlad.staff.view",
     ]
     second = await client.put(url, json=CATALOG, auth=auth)
-    assert all(v == [] for v in second.json().values())
+    assert all(value == [] for value in second.json().values())
 
     changed = {"modules": [{**CATALOG["modules"][0], "name": "Muestras de lab"}]}
     third = (

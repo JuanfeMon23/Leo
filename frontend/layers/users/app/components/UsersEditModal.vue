@@ -24,9 +24,9 @@ const form = useZodForm(userEditSchema, {
   resetOn: open
 })
 
-const onSubmit = form.submit(async (v) => {
+const onSubmit = form.submit(async (formValues) => {
   if (!props.user) return
-  const saved = await api.update(props.user.id, v)
+  const saved = await api.update(props.user.id, formValues)
   emit('saved', saved)
   open.value = false
 })

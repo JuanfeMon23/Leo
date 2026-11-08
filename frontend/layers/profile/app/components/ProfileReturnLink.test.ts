@@ -14,10 +14,10 @@ beforeEach(() => {
 
 describe('ProfileReturnLink', () => {
   it('con una URL del origen de una app: «Volver a <app>»', async () => {
-    const w = await mountSuspended(ProfileReturnLink, { props: { returnParam: 'https://vladimir.example.co/samples' } })
-    const a = w.get('[data-testid="profile-return"]')
-    expect(a.text()).toContain('Volver a Vladimir')
-    expect(a.attributes('href')).toBe('https://vladimir.example.co/samples')
+    const wrapper = await mountSuspended(ProfileReturnLink, { props: { returnParam: 'https://vladimir.example.co/samples' } })
+    const link = wrapper.get('[data-testid="profile-return"]')
+    expect(link.text()).toContain('Volver a Vladimir')
+    expect(link.attributes('href')).toBe('https://vladimir.example.co/samples')
   })
 
   it.each([
@@ -27,12 +27,12 @@ describe('ProfileReturnLink', () => {
     '/users',
     ''
   ])('no muestra enlace para «%s»', async (returnParam) => {
-    const w = await mountSuspended(ProfileReturnLink, { props: { returnParam } })
-    expect(w.find('[data-testid="profile-return"]').exists()).toBe(false)
+    const wrapper = await mountSuspended(ProfileReturnLink, { props: { returnParam } })
+    expect(wrapper.find('[data-testid="profile-return"]').exists()).toBe(false)
   })
 
   it('sin parámetro no muestra enlace', async () => {
-    const w = await mountSuspended(ProfileReturnLink)
-    expect(w.find('a').exists()).toBe(false)
+    const wrapper = await mountSuspended(ProfileReturnLink)
+    expect(wrapper.find('a').exists()).toBe(false)
   })
 })

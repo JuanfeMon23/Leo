@@ -9,7 +9,7 @@ import { USERS_DOCUMENT_LABELS } from '../utils/userSchemas'
  * se enlazan solos).
  */
 const documentOptions = toSelectOptions(
-  Object.fromEntries(USERS_DOCUMENT_TYPES.map(t => [t, `${t} · ${USERS_DOCUMENT_LABELS[t]}`])) as Record<string, string>
+  Object.fromEntries(USERS_DOCUMENT_TYPES.map(documentType => [documentType, `${documentType} · ${USERS_DOCUMENT_LABELS[documentType]}`])) as Record<string, string>
 )
 </script>
 

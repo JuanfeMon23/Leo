@@ -12,9 +12,9 @@ export function emptyAuditFilters(): AuditFiltersState {
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/
 
 function localDay(day: string, offset: number): string | undefined {
-  const m = DAY.exec(day)
-  if (!m) return undefined
-  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + offset).toISOString()
+  const match = DAY.exec(day)
+  if (!match) return undefined
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + offset).toISOString()
 }
 
 /** Inicio (00:00 local) del día `AAAA-MM-DD`, en ISO; `undefined` si no hay fecha válida. */

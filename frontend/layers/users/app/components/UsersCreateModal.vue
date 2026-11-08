@@ -24,8 +24,8 @@ watch(open, (isOpen) => { if (!isOpen) form.reset() })
 
 const values = form.values as { password?: string }
 
-const onSubmit = form.submit(async (v) => {
-  const saved = await api.create(v)
+const onSubmit = form.submit(async (formValues) => {
+  const saved = await api.create(formValues)
   emit('saved', saved)
   open.value = false
 })

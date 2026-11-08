@@ -28,7 +28,7 @@ onMounted(() => {
   void list.loadApplications()
 })
 
-const appFilterOptions = computed(() => list.applications.value.map(a => ({ value: a.id, label: a.name })))
+const appFilterOptions = computed(() => list.applications.value.map(application => ({ value: application.id, label: application.name })))
 
 const columns: UiDataTableColumn<RoleRead>[] = [
   { key: 'name', label: 'Rol' },

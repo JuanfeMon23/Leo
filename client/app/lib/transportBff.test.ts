@@ -16,9 +16,9 @@ const SDK_USER = {
 }
 
 function decodeJwt(proof: string) {
-  const [h, p] = proof.split('.') as [string, string]
-  const parse = (s: string) => JSON.parse(new TextDecoder().decode(base64UrlDecode(s)))
-  return { header: parse(h), payload: parse(p) }
+  const [headerPart, payloadPart] = proof.split('.') as [string, string]
+  const parse = (encoded: string) => JSON.parse(new TextDecoder().decode(base64UrlDecode(encoded)))
+  return { header: parse(headerPart), payload: parse(payloadPart) }
 }
 
 const json = (status: number, body: unknown) =>
@@ -28,7 +28,7 @@ const apiError = (status: number, code: string, message = 'Mensaje en español.'
 
 function memoryReturnStore(): LeoReturnStore {
   let value: string | null = null
-  return { get: () => value, set: (v) => { value = v }, clear: () => { value = null } }
+  return { get: () => value, set: (nextValue) => { value = nextValue }, clear: () => { value = null } }
 }
 
 /**
@@ -87,7 +87,7 @@ function fakeBackend() {
         return apiError(404, 'not_found')
     }
   }
-  return { calls, handler, setAuthenticated: (v: boolean) => { authenticated = v } }
+  return { calls, handler, setAuthenticated: (isAuthenticated: boolean) => { authenticated = isAuthenticated } }
 }
 
 async function setup(overrides: { handler?: (url: string, init?: RequestInit) => Promise<Response> | Response } = {}) {
@@ -139,7 +139,7 @@ describe('createLeoBffTransport: login', () => {
   it('rechaza una authorize_url atada a otra llave o no http(s)', async () => {
     for (const authorize_url of [`${LEO}/authorize?dpop_jkt=otra-llave`, 'javascript:alert(1)', 42]) {
       const { transport } = await setup({ handler: () => json(200, { authorize_url }) })
-      const err = await transport.login('/').catch(e => e)
+      const err = await transport.login('/').catch(error => error)
       expect(err).toBeInstanceOf(LeoApiError)
       expect(leoErrorMessage(err)).toMatch(/inicio de sesión/)
     }
@@ -177,20 +177,20 @@ describe('createLeoBffTransport: retorno (callback)', () => {
     const [first, second] = await Promise.all([transport.completeLogin!(params), transport.completeLogin!(params)])
     expect(second).toBe(first)
     expect(await transport.completeLogin!(params)).toBe(first)
-    expect(backend.calls.filter(c => c.url.includes('/auth/callback'))).toHaveLength(1)
+    expect(backend.calls.filter(call => call.url.includes('/auth/callback'))).toHaveLength(1)
   })
 
   it('sin ruta guardada o con una insegura vuelve a /', async () => {
-    const a = await setup()
-    await a.transport.login('/')
-    a.returnStore.set('//evil.example')
-    expect((await a.transport.completeLogin!({ code: 'good-code', state: 'state-123' })).returnTo).toBe('/')
+    const context = await setup()
+    await context.transport.login('/')
+    context.returnStore.set('//evil.example')
+    expect((await context.transport.completeLogin!({ code: 'good-code', state: 'state-123' })).returnTo).toBe('/')
   })
 
   it('state inválido → invalid_state con mensaje legible', async () => {
     const { transport, onUnauthorized } = await setup()
     await transport.login('/')
-    const err = await transport.completeLogin!({ code: 'good-code', state: 'otro' }).catch(e => e)
+    const err = await transport.completeLogin!({ code: 'good-code', state: 'otro' }).catch(error => error)
     expect(err).toMatchObject({ status: 400, code: 'invalid_state' })
     expect(leoErrorMessage(err)).toBe('La solicitud de inicio de sesión expiró o no es válida.')
     expect(onUnauthorized).not.toHaveBeenCalled()
@@ -259,7 +259,7 @@ describe('createLeoBffTransport: request y configuración', () => {
     const { transport, fetchMock } = await setup({
       handler: () => apiError(403, 'forbidden', 'No tienes permiso para realizar esta acción.')
     })
-    const err = await transport.request('/things', { query: { q: 'x' } }).catch(e => e)
+    const err = await transport.request('/things', { query: { q: 'x' } }).catch(error => error)
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe(`${BACKEND}/things?q=x`)
     expect(init.credentials).toBe('include')

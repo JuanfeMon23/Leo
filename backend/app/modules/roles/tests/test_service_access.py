@@ -99,7 +99,7 @@ async def test_conceder_y_listar_con_permisos_legibles(world: World):
         json={"role_ids": [str(world.r_view.id), str(world.r_tauro.id)]},
     )
     assert response.status_code == 200, response.text
-    grants = {g["application"]["slug"]: g for g in response.json()}
+    grants = {grant["application"]["slug"]: grant for grant in response.json()}
     assert set(grants) == {"vlad", "tauro"}
     vlad = grants["vlad"]
     assert vlad["role"] == {
@@ -110,7 +110,9 @@ async def test_conceder_y_listar_con_permisos_legibles(world: World):
     }
     assert vlad["application"]["id"] == str(world.vlad.app.id)
     assert vlad["application"]["name"] == "App vlad"
-    assert [a["tag"] for a in vlad["permissions"]] == ["vlad.catalog.view"]
+    assert [permission["tag"] for permission in vlad["permissions"]] == [
+        "vlad.catalog.view"
+    ]
     assert vlad["permissions"][0]["name"] == "View"
     assert vlad["permissions"][0]["module"]["slug"] == "catalog"
     assert {"id", "created_at"} <= set(vlad)
@@ -224,7 +226,7 @@ async def test_retirar_concesion_audita_y_devuelve_el_resto(world: World, sessio
     )
     response = await world.admin.delete(url(world.caller.app.id, world.r_view.id))
     assert response.status_code == 200, response.text
-    assert [g["role"]["slug"] for g in response.json()] == ["editor"]
+    assert [grant["role"]["slug"] for grant in response.json()] == ["editor"]
     last = (await events(session, world.caller.app.id))[-1]
     assert last.changes["service_roles"] == {
         "before": ["vlad:editor", "vlad:viewer"],
@@ -251,8 +253,8 @@ async def test_retirar_la_ultima_concesion_revoca_los_tokens_de_inmediato(
     assert not await world.active(to_vlad, world.vlad)
     assert await world.active(to_tauro, world.tauro)  # otra audiencia: intacto
     rows = {
-        r.audience_application_id: r
-        for r in (
+        response.audience_application_id: response
+        for response in (
             await session.scalars(
                 select(ServiceToken).execution_options(populate_existing=True)
             )
@@ -321,7 +323,10 @@ async def test_service_callers_de_un_rol(world: World, session):
     response = await world.admin.get(f"/api/v1/roles/{world.r_view.id}/service-callers")
     assert response.status_code == 200, response.text
     callers = response.json()
-    assert [c["application"]["slug"] for c in callers] == ["acuarius", "incubus"]
+    assert [caller["application"]["slug"] for caller in callers] == [
+        "acuarius",
+        "incubus",
+    ]
     assert set(callers[0]) == {"id", "application", "created_at"}
     assert set(callers[0]["application"]) == {"id", "slug", "name", "is_active"}
     empty = await world.admin.get(f"/api/v1/roles/{world.r_edit.id}/service-callers")
@@ -358,8 +363,8 @@ async def test_todos_los_endpoints_exigen_el_tag(world: World, session, make_bro
         await nav.delete(url(caller, role)),
         await nav.get(f"/api/v1/roles/{role}/service-callers"),
     ]
-    assert [r.status_code for r in attempts] == [403, 403, 403, 403]
-    assert all(r.json()["code"] == "forbidden" for r in attempts)
+    assert [response.status_code for response in attempts] == [403, 403, 403, 403]
+    assert all(response.json()["code"] == "forbidden" for response in attempts)
     denied = (
         await session.scalars(
             select(AuditEvent).where(

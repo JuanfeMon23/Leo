@@ -21,9 +21,9 @@ const submit = () => document.body.querySelector<HTMLFormElement>('[role="dialog
 const preview = () => document.body.querySelector('[data-testid="tag-preview"]')!.textContent
 const inputs = () => [...document.body.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('[role="dialog"] input, [role="dialog"] textarea')]
 
-async function type(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
-  el.value = value
-  el.dispatchEvent(new Event('input', { bubbles: true }))
+async function type(element: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  element.value = value
+  element.dispatchEvent(new Event('input', { bubbles: true }))
   await flushPromises()
 }
 
@@ -75,7 +75,7 @@ describe('ApplicationsActionFormModal', () => {
     await type(inputs()[1]!, 'view')
     submit()
     await vi.waitFor(() => expect(document.body.querySelector('[role="alert"]')?.textContent).toContain('Ya existe una acción en este módulo'))
-    const alert = [...document.body.querySelectorAll('[role="alert"]')].find(a => a.textContent?.includes('Ya existe'))!
+    const alert = [...document.body.querySelectorAll('[role="alert"]')].find(alertElement => alertElement.textContent?.includes('Ya existe'))!
     expect(alert.closest('.flex.flex-col')?.textContent).toContain('Nombre del permiso')
   })
 

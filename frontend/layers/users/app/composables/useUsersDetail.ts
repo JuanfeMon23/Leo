@@ -22,15 +22,15 @@ export function useUsersDetail(userId: () => string) {
   const groups = computed(() => usersGroupRolesByApp(user.value?.roles ?? [], applications.value))
   const accessApps = computed(() => usersAccessApps(groups.value))
   const roleOptions = computed(() =>
-    usersRoleOptions(allRoles.value, applications.value, new Set((user.value?.roles ?? []).map(r => r.id)))
+    usersRoleOptions(allRoles.value, applications.value, new Set((user.value?.roles ?? []).map(role => role.id)))
   )
   const effective = computed(() => usersEffectivePermissions(roleDetails.value, applications.value))
 
   async function loadEffective() {
-    const active = (user.value?.roles ?? []).filter(r => r.is_active)
-    const results = await Promise.allSettled(active.map(r => api.getRole(r.id)))
-    roleDetails.value = results.flatMap(r => (r.status === 'fulfilled' ? [r.value] : []))
-    if (results.some(r => r.status === 'rejected')) {
+    const active = (user.value?.roles ?? []).filter(role => role.is_active)
+    const results = await Promise.allSettled(active.map(result => api.getRole(result.id)))
+    roleDetails.value = results.flatMap(result => (result.status === 'fulfilled' ? [result.value] : []))
+    if (results.some(result => result.status === 'rejected')) {
       lookupError.value = 'No se pudieron cargar todos los permisos de sus roles.'
     }
   }
@@ -40,7 +40,7 @@ export function useUsersDetail(userId: () => string) {
     const [apps, roles] = await Promise.allSettled([api.listApplications(), api.listActiveRoles()])
     if (apps.status === 'fulfilled') applications.value = apps.value.items
     if (roles.status === 'fulfilled') allRoles.value = roles.value.items
-    const failed = [apps, roles].find((r): r is PromiseRejectedResult => r.status === 'rejected')
+    const failed = [apps, roles].find((result): result is PromiseRejectedResult => result.status === 'rejected')
     if (failed) {
       lookupError.value = `No se pudo cargar la lista de aplicaciones y roles: ${userErrorMessage(failed.reason)}`
     }

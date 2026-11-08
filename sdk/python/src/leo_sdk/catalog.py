@@ -97,14 +97,16 @@ class Catalog:
         vacios se omiten (Leo no acepta `null` explicito en `description`)."""
 
         def clean(**fields: Any) -> dict[str, Any]:
-            return {k: v for k, v in fields.items() if v is not None}
+            return {key: value for key, value in fields.items() if value is not None}
 
         modules = []
         for module in self._modules.values():
             actions = [
-                clean(verb=a.verb, name=a.name, description=a.description)
-                for a in self._actions.values()
-                if a.module == module.slug
+                clean(
+                    verb=action.verb, name=action.name, description=action.description
+                )
+                for action in self._actions.values()
+                if action.module == module.slug
             ]
             modules.append(
                 clean(

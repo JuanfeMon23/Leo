@@ -23,30 +23,30 @@ afterEach(() => { document.body.innerHTML = '' })
 const dialog = () => document.body.querySelector('[role="dialog"]')!
 const input = (name: string) => dialog().querySelector<HTMLInputElement | HTMLSelectElement>(`[name="${name}"], #field-${name}`)
 const controls = () => [...dialog().querySelectorAll<HTMLInputElement | HTMLSelectElement>('input, select')]
-async function type(el: HTMLInputElement | HTMLSelectElement, value: string) {
-  el.value = value
-  el.dispatchEvent(new Event(el instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }))
+async function type(element: HTMLInputElement | HTMLSelectElement, value: string) {
+  element.value = value
+  element.dispatchEvent(new Event(element instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }))
   await flushPromises()
 }
 const submit = () => dialog().querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit', { cancelable: true }))
 
 /** Orden de los controles: usuario, nombres, apellidos, correo, tipo doc, número doc, contraseña. */
 async function fill(over: Partial<Record<'username' | 'first' | 'last' | 'email' | 'type' | 'number' | 'password', string>> = {}) {
-  const v = { username: 'ana.perez', first: 'Ana', last: 'Pérez', email: 'ana@x.co', type: 'CC', number: '1.234', password: 'Segura-Clave-2026', ...over }
-  const c = controls()
-  await type(c[0]!, v.username)
-  await type(c[1]!, v.first)
-  await type(c[2]!, v.last)
-  await type(c[3]!, v.email)
-  await type(c[4]!, v.type)
-  await type(c[5]!, v.number)
-  await type(c[6]!, v.password)
+  const values = { username: 'ana.perez', first: 'Ana', last: 'Pérez', email: 'ana@x.co', type: 'CC', number: '1.234', password: 'Segura-Clave-2026', ...over }
+  const fields = controls()
+  await type(fields[0]!, values.username)
+  await type(fields[1]!, values.first)
+  await type(fields[2]!, values.last)
+  await type(fields[3]!, values.email)
+  await type(fields[4]!, values.type)
+  await type(fields[5]!, values.number)
+  await type(fields[6]!, values.password)
 }
 
 describe('UsersCreateModal', () => {
   it('muestra los requisitos de la contraseña y se actualizan al escribir', async () => {
     await mountSuspended(UsersCreateModal, { props: { open: true }, attachTo: document.body })
-    const reqs = () => [...dialog().querySelectorAll('[data-testid="password-requirement"]')].map(li => li.getAttribute('data-met'))
+    const reqs = () => [...dialog().querySelectorAll('[data-testid="password-requirement"]')].map(item => item.getAttribute('data-met'))
     expect(reqs()).toEqual(['false', 'false', 'false', 'false', 'false'])
     await type(controls()[6]!, 'Segura-Clave-2026')
     expect(reqs()).toEqual(['true', 'true', 'true', 'true', 'true'])
@@ -58,7 +58,7 @@ describe('UsersCreateModal', () => {
     submit()
     await vi.waitFor(() => expect(document.body.textContent).toContain('sin puntos ni espacios'))
     expect(document.body.textContent).toContain('aún no cumple todos los requisitos')
-    expect(api.mock.calls.filter(c => c[0] !== '/auth/password-policy')).toEqual([])
+    expect(api.mock.calls.filter(call => call[0] !== '/auth/password-policy')).toEqual([])
   })
 
   it('el número de documento con letras se envía en mayúsculas y el usuario en minúsculas', async () => {
@@ -104,7 +104,7 @@ describe('UsersCreateModal', () => {
   })
 
   it('al cerrar se limpia la contraseña', async () => {
-    const wrapper = await mountSuspended(UsersCreateModal, { props: { open: true, 'onUpdate:open': (v: boolean) => wrapper.setProps({ open: v }) }, attachTo: document.body })
+    const wrapper = await mountSuspended(UsersCreateModal, { props: { open: true, 'onUpdate:open': (isOpen: boolean) => wrapper.setProps({ open: isOpen }) }, attachTo: document.body })
     await type(controls()[6]!, 'Segura-Clave-2026')
     await wrapper.setProps({ open: false })
     await flushPromises()

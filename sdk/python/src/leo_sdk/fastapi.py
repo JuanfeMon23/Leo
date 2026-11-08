@@ -127,13 +127,16 @@ class LeoAuth:
         )
 
     def set_session_cookies(self, response: Response, tokens: TokenSet) -> None:
-        s = self.settings
+        leo_settings = self.settings
         self._set_cookie(
-            response, s.access_cookie_name, tokens.access_token, tokens.expires_in
+            response,
+            leo_settings.access_cookie_name,
+            tokens.access_token,
+            tokens.expires_in,
         )
         self._set_cookie(
             response,
-            s.refresh_cookie_name,
+            leo_settings.refresh_cookie_name,
             tokens.refresh_token,
             tokens.refresh_expires_in,
         )
@@ -169,7 +172,11 @@ class LeoAuth:
         """Token del header `Authorization: Bearer`; None si la peticion no usa
         ese esquema; "" si viene vacio."""
         values = request.headers.getlist("authorization")
-        bearers = [v for v in values if v[:7].lower() == "bearer "]
+        bearers = [
+            header_value
+            for header_value in values
+            if header_value[:7].lower() == "bearer "
+        ]
         if not bearers:
             return None
         if len(values) > 1:
@@ -204,9 +211,9 @@ class LeoAuth:
     async def _authenticate(
         self, request: Request, response: Response, *, use_cache: bool
     ) -> LeoUser:
-        s = self.settings
-        access = request.cookies.get(self._cookie(s.access_cookie_name))
-        refresh = request.cookies.get(self._cookie(s.refresh_cookie_name))
+        leo_settings = self.settings
+        access = request.cookies.get(self._cookie(leo_settings.access_cookie_name))
+        refresh = request.cookies.get(self._cookie(leo_settings.refresh_cookie_name))
         if not access and not refresh:
             raise _not_authenticated()
         proof = await self.proof(request)
@@ -310,7 +317,7 @@ def leo_router(auth: LeoAuth, *, prefix: str = "/auth") -> APIRouter:
     """Rutas del login BFF: `/login`, `/callback`, `/me`, `/activity`,
     `/logout`. Ninguna respuesta lleva tokens en el cuerpo."""
     router = APIRouter(prefix=prefix, tags=["leo-auth"])
-    s = auth.settings
+    leo_settings = auth.settings
 
     @router.get("/login")
     async def login(request: Request, response: Response) -> dict[str, str]:
@@ -319,14 +326,17 @@ def leo_router(auth: LeoAuth, *, prefix: str = "/auth") -> APIRouter:
         proof = await auth.proof(request)
         flow = new_flow(jkt=proof.jkt)
         auth._set_cookie(
-            response, s.flow_cookie_name, auth._flow.dumps(flow), s.flow_ttl_seconds
+            response,
+            leo_settings.flow_cookie_name,
+            auth._flow.dumps(flow),
+            leo_settings.flow_ttl_seconds,
         )
         response.headers["Cache-Control"] = "no-store"
         return {
             "authorize_url": build_authorize_url(
-                s.leo_url,
-                client_id=s.app_client_id,
-                redirect_uri=s.callback_url,
+                leo_settings.leo_url,
+                client_id=leo_settings.app_client_id,
+                redirect_uri=leo_settings.callback_url,
                 flow=flow,
             )
         }
@@ -341,7 +351,7 @@ def leo_router(auth: LeoAuth, *, prefix: str = "/auth") -> APIRouter:
     ) -> dict[str, Any]:
         """Canjea el code (la pagina de retorno la llama con fetch + DPoP)."""
         proof = await auth.proof(request)
-        cookie_value = request.cookies.get(auth._cookie(s.flow_cookie_name))
+        cookie_value = request.cookies.get(auth._cookie(leo_settings.flow_cookie_name))
         invalid = LeoError(
             "invalid_state",
             "La solicitud de inicio de sesión expiró o no es válida. "
@@ -361,10 +371,10 @@ def leo_router(auth: LeoAuth, *, prefix: str = "/auth") -> APIRouter:
         ):
             raise invalid
         tokens = await auth.client.exchange_code(
-            code, flow.code_verifier, s.callback_url, proof.jkt
+            code, flow.code_verifier, leo_settings.callback_url, proof.jkt
         )
         auth.set_session_cookies(response, tokens)
-        auth._delete_cookie(response, s.flow_cookie_name)
+        auth._delete_cookie(response, leo_settings.flow_cookie_name)
         response.headers["Cache-Control"] = "no-store"
         user = await auth.sessions.user_for(tokens.access_token, proof.jkt)
         if user is None:
@@ -389,8 +399,8 @@ def leo_router(auth: LeoAuth, *, prefix: str = "/auth") -> APIRouter:
     async def logout(request: Request, response: Response) -> Response:
         """Revoca la sesion SSO (todas las apps) y borra las cookies."""
         auth._reject_service(request)
-        access = request.cookies.get(auth._cookie(s.access_cookie_name))
-        refresh = request.cookies.get(auth._cookie(s.refresh_cookie_name))
+        access = request.cookies.get(auth._cookie(leo_settings.access_cookie_name))
+        refresh = request.cookies.get(auth._cookie(leo_settings.refresh_cookie_name))
         token = access or refresh
         if token:
             proof = await auth.proof(request)

@@ -17,8 +17,8 @@ function messages(result: { success: boolean, error?: { issues: { message: strin
 
 describe('applicationCreateSchema', () => {
   it('valida y entrega el payload del backend (recortado, null, lista sin repetidos)', () => {
-    const r = applicationCreateSchema.parse({ ...valid, redirect_uris: 'https://a.test/cb\n\n  https://b.test/cb  \nhttps://a.test/cb' })
-    expect(r).toEqual({
+    const result = applicationCreateSchema.parse({ ...valid, redirect_uris: 'https://a.test/cb\n\n  https://b.test/cb  \nhttps://a.test/cb' })
+    expect(result).toEqual({
       slug: 'vladimir',
       name: 'Vladimir',
       description: null,
@@ -61,8 +61,8 @@ describe('applicationCreateSchema', () => {
   })
 
   it('una redirect_uri inválida dice cuál línea', () => {
-    const r = applicationCreateSchema.safeParse({ ...valid, redirect_uris: 'https://a.test/cb\nnope' })
-    expect(messages(r)).toEqual(['Línea 2: debe ser una URL absoluta http o https.'])
+    const result = applicationCreateSchema.safeParse({ ...valid, redirect_uris: 'https://a.test/cb\nnope' })
+    expect(messages(result)).toEqual(['Línea 2: debe ser una URL absoluta http o https.'])
   })
 
   it('redirect_uri con fragmento es inválida', () => {
@@ -72,7 +72,7 @@ describe('applicationCreateSchema', () => {
   })
 
   it('máximo 20 redirect_uris', () => {
-    const many = (n: number) => Array.from({ length: n }, (_, i) => `https://a.test/${i}`).join('\n')
+    const many = (count: number) => Array.from({ length: count }, (_, i) => `https://a.test/${i}`).join('\n')
     expect(applicationCreateSchema.safeParse({ ...valid, redirect_uris: many(20) }).success).toBe(true)
     expect(messages(applicationCreateSchema.safeParse({ ...valid, redirect_uris: many(21) }))).toContain('Máximo 20 redirect URIs.')
   })
@@ -80,8 +80,8 @@ describe('applicationCreateSchema', () => {
 
 describe('applicationEditSchema', () => {
   it('no incluye el slug (inmutable)', () => {
-    const r = applicationEditSchema.parse({ name: 'N', description: 'd', base_url: 'https://x.test', redirect_uris: '', slug: 'otro' })
-    expect(r).not.toHaveProperty('slug')
+    const result = applicationEditSchema.parse({ name: 'N', description: 'd', base_url: 'https://x.test', redirect_uris: '', slug: 'otro' })
+    expect(result).not.toHaveProperty('slug')
   })
 })
 

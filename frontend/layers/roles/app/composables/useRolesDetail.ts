@@ -24,11 +24,11 @@ export function useRolesDetail(roleId: () => string) {
   const saveError = ref<string | null>(null)
 
   const model = computed(() => rolesBuildPermissionModel(catalog.value?.modules ?? [], role.value?.actions ?? []))
-  const diff = computed(() => rolesDiffActions((role.value?.actions ?? []).map(a => a.id), selected.value))
+  const diff = computed(() => rolesDiffActions((role.value?.actions ?? []).map(action => action.id), selected.value))
   const dirty = computed(() => diff.value.add.length + diff.value.remove.length > 0)
 
   function resetDraft() {
-    selected.value = new Set((role.value?.actions ?? []).map(a => a.id))
+    selected.value = new Set((role.value?.actions ?? []).map(action => action.id))
   }
 
   async function loadCatalog(applicationId: string) {

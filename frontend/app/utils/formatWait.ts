@@ -1,5 +1,5 @@
-function plural(n: number, unit: string): string {
-  return `${n} ${unit}${n === 1 ? '' : 's'}`
+function plural(count: number, unit: string): string {
+  return `${count} ${unit}${count === 1 ? '' : 's'}`
 }
 
 /** "45 segundos", "2 minutos", "1 hora": espera legible (se redondea hacia arriba). */

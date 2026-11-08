@@ -1,4 +1,4 @@
-const pad = (n: number) => String(n).padStart(2, '0')
+const pad = (value: number) => String(value).padStart(2, '0')
 
 export interface FormatLocalDateTimeOptions {
   /** Incluir segundos (`HH:MM:SS`). */
@@ -11,8 +11,8 @@ export interface FormatLocalDateTimeOptions {
 export function formatLocalDateTime(iso: string | null | undefined, options: FormatLocalDateTimeOptions = {}): string {
   const fallback = options.fallback ?? '—'
   if (!iso) return fallback
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return fallback
-  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}${options.seconds ? `:${pad(d.getSeconds())}` : ''}`
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${time}`
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return fallback
+  const time = `${pad(date.getHours())}:${pad(date.getMinutes())}${options.seconds ? `:${pad(date.getSeconds())}` : ''}`
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${time}`
 }

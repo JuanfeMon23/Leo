@@ -29,12 +29,12 @@ const roleDetail = (actions: unknown[], over: Record<string, unknown> = {}) => (
 })
 
 /** Enruta las llamadas de la API por método y ruta. */
-function route(handlers: Record<string, unknown | ((o: any) => unknown)>) {
+function route(handlers: Record<string, unknown | ((options: any) => unknown)>) {
   api.mockImplementation(async (url: string, opts: { method?: string } = {}) => {
     const key = `${opts.method ?? 'GET'} ${url}`
-    const h = handlers[key]
-    if (h === undefined) throw new Error(`sin handler: ${key}`)
-    const out = typeof h === 'function' ? (h as (o: unknown) => unknown)(opts) : h
+    const handler = handlers[key]
+    if (handler === undefined) throw new Error(`sin handler: ${key}`)
+    const out = typeof handler === 'function' ? (handler as (options: unknown) => unknown)(opts) : handler
     if (out instanceof Error) throw out
     return out
   })
@@ -48,7 +48,7 @@ beforeEach(() => {
 })
 afterEach(() => { document.body.innerHTML = '' })
 
-async function mountDetail(handlers: Record<string, unknown | ((o: any) => unknown)>) {
+async function mountDetail(handlers: Record<string, unknown | ((options: any) => unknown)>) {
   route({ 'GET /roles/r1': roleDetail([assignedAction('a1', 'Consultar muestras')]), 'GET /applications/app1': catalog, ...handlers })
   const wrapper = await mountSuspended(RolesDetail, { props: { id: 'r1' }, attachTo: document.body })
   await flushPromises()
@@ -79,7 +79,7 @@ describe('RolesDetail', () => {
     await flushPromises()
     expect(api).toHaveBeenCalledWith('/roles/r1/actions', { method: 'POST', body: { action_ids: ['a2'] } })
     expect(wrapper.get('[data-testid="change-summary"]').text()).toBe('Sin cambios pendientes.')
-    expect(api.mock.calls.some(([, o]) => o?.method === 'DELETE')).toBe(false)
+    expect(api.mock.calls.some(([, options]) => options?.method === 'DELETE')).toBe(false)
   })
 
   it('quitar permisos: un DELETE por acción quitada', async () => {
@@ -89,7 +89,7 @@ describe('RolesDetail', () => {
     await wrapper.get('[data-testid="save"]').trigger('click')
     await flushPromises()
     expect(api).toHaveBeenCalledWith('/roles/r1/actions/a1', { method: 'DELETE' })
-    expect(api.mock.calls.some(([, o]) => o?.method === 'POST')).toBe(false)
+    expect(api.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false)
   })
 
   it('«Seleccionar todo» del módulo envía todos los asignables en un solo POST', async () => {
@@ -98,7 +98,7 @@ describe('RolesDetail', () => {
     await wrapper.get('[data-testid="group-all"] input').setValue(true)
     await wrapper.get('[data-testid="save"]').trigger('click')
     await flushPromises()
-    const posts = api.mock.calls.filter(([, o]) => o?.method === 'POST')
+    const posts = api.mock.calls.filter(([, options]) => options?.method === 'POST')
     expect(posts).toHaveLength(1)
     expect(posts[0]![1].body).toEqual({ action_ids: ['a2'] })
   })
@@ -120,7 +120,7 @@ describe('RolesDetail', () => {
     await flushPromises()
     expect(wrapper.get('[data-testid="save-error"]').text()).toContain('Algunos permisos ya no están disponibles')
     expect(wrapper.get('[data-testid="change-summary"]').text()).toContain('1 por agregar')
-    expect(api.mock.calls.filter(([url, o]) => url === '/roles/r1' && !o).length).toBeGreaterThanOrEqual(2)
+    expect(api.mock.calls.filter(([url, options]) => url === '/roles/r1' && !options).length).toBeGreaterThanOrEqual(2)
   })
 
   it('error de red al guardar: nunca el texto crudo', async () => {
@@ -156,7 +156,7 @@ describe('RolesDetail', () => {
     const wrapper = await mountDetail({ 'POST /roles/r1/deactivate': roleDetail([], { is_active: false }) })
     await wrapper.get('[data-testid="role-toggle"]').trigger('click')
     expect(document.body.textContent).toContain('Se desactivará «Analista»')
-    const confirm = [...document.body.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Desactivar' && b.closest('[role="dialog"]'))!
+    const confirm = [...document.body.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Desactivar' && button.closest('[role="dialog"]'))!
     confirm.click()
     await flushPromises()
     expect(api).toHaveBeenCalledWith('/roles/r1/deactivate', { method: 'POST' })

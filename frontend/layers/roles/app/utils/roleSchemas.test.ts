@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { roleCreateSchema, roleEditSchema } from './roleSchemas'
 
 const valid = { application_id: 'app-1', slug: 'lab-admin', name: ' Administrador ', description: '' }
-const messages = (r: { success: boolean, error?: { issues: { message: string }[] } }) => (r.success ? [] : r.error!.issues.map(i => i.message))
+const messages = (result: { success: boolean, error?: { issues: { message: string }[] } }) => (result.success ? [] : result.error!.issues.map(i => i.message))
 
 describe('roleCreateSchema', () => {
   it('entrega el payload del backend (recortado, descripción null)', () => {

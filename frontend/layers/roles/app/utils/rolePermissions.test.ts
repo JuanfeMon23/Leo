@@ -34,38 +34,38 @@ const assigned = (id: string, name: string, moduleId = 'm1'): RoleActionRead => 
 describe('rolesBuildPermissionModel', () => {
   it('agrupa por módulo en orden del catálogo, con nombre legible, descripción y tag', () => {
     const { groups } = rolesBuildPermissionModel(catalog, [])
-    expect(groups.map(g => g.name)).toEqual(['Muestras', 'Módulo viejo'])
-    expect(groups[0]!.permissions.map(p => p.name)).toEqual(['Consultar muestras', 'Editar muestras', 'Antigua'])
+    expect(groups.map(group => group.name)).toEqual(['Muestras', 'Módulo viejo'])
+    expect(groups[0]!.permissions.map(permission => permission.name)).toEqual(['Consultar muestras', 'Editar muestras', 'Antigua'])
     expect(groups[0]!.permissions[0]).toMatchObject({ id: 'a1', tag: 'vladimir.samples.view', description: 'Desc Consultar muestras', selectable: true })
   })
 
   it('las acciones de evento van aparte y no son asignables', () => {
     const { groups, events } = rolesBuildPermissionModel(catalog, [])
-    expect(events.map(e => e.id)).toEqual(['e1'])
+    expect(events.map(event => event.id)).toEqual(['e1'])
     expect(events[0]!.selectable).toBe(false)
-    expect(groups.flatMap(g => g.permissions).some(p => p.id === 'e1')).toBe(false)
+    expect(groups.flatMap(group => group.permissions).some(permission => permission.id === 'e1')).toBe(false)
   })
 
   it('acciones inactivas y de módulos inactivos no se pueden marcar, con motivo', () => {
     const { groups } = rolesBuildPermissionModel(catalog, [])
-    expect(groups[0]!.permissions.find(p => p.id === 'a3')).toMatchObject({ selectable: false, blockedReason: 'Acción desactivada.' })
+    expect(groups[0]!.permissions.find(permission => permission.id === 'a3')).toMatchObject({ selectable: false, blockedReason: 'Acción desactivada.' })
     expect(groups[1]!.permissions[0]).toMatchObject({ selectable: false, blockedReason: 'Módulo desactivado.' })
   })
 
   it('omite módulos sin permisos', () => {
-    expect(rolesBuildPermissionModel(catalog, []).groups.some(g => g.slug === 'empty')).toBe(false)
+    expect(rolesBuildPermissionModel(catalog, []).groups.some(group => group.slug === 'empty')).toBe(false)
   })
 
   it('una acción asignada que ya no está en el catálogo igual aparece (para poder quitarla)', () => {
     const { groups } = rolesBuildPermissionModel(catalog, [assigned('zz', 'Huérfana', 'm9')])
-    const orphan = groups.find(g => g.moduleId === 'm9')!
+    const orphan = groups.find(group => group.moduleId === 'm9')!
     expect(orphan.permissions[0]).toMatchObject({ id: 'zz', name: 'Huérfana', selectable: true })
   })
 
   it('una inactiva ya asignada se muestra, pero no se puede volver a marcar', () => {
     const inactiveAssigned: RoleActionRead = { ...assigned('a3', 'Antigua'), is_active: false }
     const { groups } = rolesBuildPermissionModel(catalog, [inactiveAssigned])
-    expect(groups[0]!.permissions.find(p => p.id === 'a3')!.selectable).toBe(false)
+    expect(groups[0]!.permissions.find(permission => permission.id === 'a3')!.selectable).toBe(false)
   })
 })
 

@@ -105,7 +105,7 @@ describe('ApplicationsDetail', () => {
     await wrapper.get('[data-testid="module-toggle"]').trigger('click')
     expect(document.body.textContent).toContain('Se desactivará el módulo «Muestras»')
     api.mockResolvedValue(detail())
-    const confirm = [...document.body.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Desactivar' && b.closest('[role="dialog"]'))!
+    const confirm = [...document.body.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Desactivar' && button.closest('[role="dialog"]'))!
     confirm.click()
     await flushPromises()
     expect(api).toHaveBeenCalledWith('/applications/a1/modules/m1/deactivate', { method: 'POST' })

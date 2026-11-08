@@ -23,7 +23,11 @@ def test_check_sale_con_1_si_el_archivo_difiere(tmp_path, monkeypatch, capsys) -
 
 
 def test_eventos_no_son_asignables() -> None:
-    actions = {a["tag"]: a for m in build_contract()["modules"] for a in m["actions"]}
+    actions = {
+        action["tag"]: action
+        for module in build_contract()["modules"]
+        for action in module["actions"]
+    }
     assert actions["leo.auth.login"]["assignable"] is False
     assert actions["leo.users.view"]["assignable"] is True
     assert CONTRACT_PATH.name == "permissions.json"

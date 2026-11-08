@@ -40,8 +40,8 @@ export class LeoApiError extends Error {
 
 /** 422 de FastAPI (`{detail: [{loc, msg}]}`, sin el formato de Leo) → `validation_error` por campo. */
 function fromFastApiValidation(response: Response, detail: unknown[]): LeoApiError {
-  const details = detail.flatMap((d) => {
-    const { loc, msg } = (d ?? {}) as { loc?: unknown, msg?: unknown }
+  const details = detail.flatMap((date) => {
+    const { loc, msg } = (date ?? {}) as { loc?: unknown, msg?: unknown }
     if (!Array.isArray(loc) || typeof msg !== 'string') return []
     const path = loc[0] === 'body' || loc[0] === 'query' || loc[0] === 'path' ? loc.slice(1) : loc
     return [{ field: path.join('.'), message: msg }]
@@ -64,9 +64,9 @@ function toFormData(code: string, message: string, details: unknown): unknown {
   if (code === 'validation_error' && Array.isArray(details)) {
     return {
       detail: details
-        .filter((d): d is { field: string, message: string } =>
-          Boolean(d) && typeof d.field === 'string' && typeof d.message === 'string')
-        .map(d => ({ loc: d.field.split('.'), msg: d.message }))
+        .filter((detail): detail is { field: string, message: string } =>
+          Boolean(detail) && typeof detail.field === 'string' && typeof detail.message === 'string')
+        .map(detail => ({ loc: detail.field.split('.'), msg: detail.message }))
     }
   }
   return { code, message, details }
@@ -116,7 +116,7 @@ function pageSizeMessage(err: LeoApiError): string | null {
   if (err.status !== 422 || err.code !== 'validation_error') return null
   type Detail = { field?: unknown, message?: unknown, max?: unknown }
   const isObject = !Array.isArray(err.details) && err.details && typeof err.details === 'object'
-  const hit = (Array.isArray(err.details) ? (err.details as Detail[]).find(d => d?.field === 'page_size') : null)
+  const hit = (Array.isArray(err.details) ? (err.details as Detail[]).find(date => date?.field === 'page_size') : null)
     ?? (isObject && (err.details as Detail).field === 'page_size' ? (err.details as Detail) : null)
   if (!hit) return null
   if (isObject && err.message) return err.message
