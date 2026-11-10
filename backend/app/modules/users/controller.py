@@ -43,6 +43,9 @@ from app.core.security.passwords import (
 from app.core.service_authz import ServicePrincipal
 from app.modules import audit, auth, roles
 from app.modules.users import repository
+from app.modules.users.document_types_controller import (
+    require_active_document_type,
+)
 from app.modules.users.models import User, UserRole
 from app.modules.users.schemas import (
     DelegatedPasswordChange,
@@ -259,6 +262,7 @@ async def create_user(
             field_label="el usuario",
             value=data.username,
         )
+    await require_active_document_type(session, data.document_type)
     await _check_unique(
         session, email=data.email, document=(data.document_type, data.document_number)
     )
@@ -280,6 +284,8 @@ async def update_user(
 ) -> UserRead:
     user = await get_or_404(session, User, user_id, _USER)
     changes = data.model_dump(exclude_unset=True)
+    if "document_type" in changes:
+        await require_active_document_type(session, changes["document_type"])
     document = (
         changes.get("document_type", user.document_type),
         changes.get("document_number", user.document_number),
@@ -591,6 +597,7 @@ async def provision_patient(
             "Demasiadas solicitudes de alta. Intenta de nuevo más tarde.", wait
         )
 
+    await require_active_document_type(session, data.document_type)
     await _check_password(data.password, data.username, data.email)
     password_hash = hash_password(data.password)
     role = await roles.active_role_brief(session, PATIENT_APP_SLUG, PATIENT_ROLE_SLUG)

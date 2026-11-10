@@ -7,7 +7,7 @@
 --                 sobre las tablas, USAGE en las secuencias. Sin DDL, sin
 --                 TRUNCATE, sin acceso a alembic_version; sobre audit_events
 --                 y settings_history (append-only) solo SELECT e INSERT;
---                 sobre settings SELECT/INSERT/UPDATE (sin DELETE). Sin superusuario.
+--                 sobre settings y document_types SELECT/INSERT/UPDATE (sin DELETE). Sin superusuario.
 --
 -- Correr como superusuario (o un rol que pueda crear roles y cambiar duenios),
 -- conectado a la BD de Leo:
@@ -98,6 +98,11 @@ BEGIN
     IF to_regclass('public.settings') IS NOT NULL THEN
         REVOKE ALL ON TABLE public.settings FROM leo_app;
         GRANT SELECT, INSERT, UPDATE ON TABLE public.settings TO leo_app;
+    END IF;
+    -- Catalogos: se editan y desactivan (is_active) pero no se borran.
+    IF to_regclass('public.document_types') IS NOT NULL THEN
+        REVOKE ALL ON TABLE public.document_types FROM leo_app;
+        GRANT SELECT, INSERT, UPDATE ON TABLE public.document_types TO leo_app;
     END IF;
     IF to_regclass('public.alembic_version') IS NOT NULL THEN
         REVOKE ALL ON TABLE public.alembic_version FROM leo_app;

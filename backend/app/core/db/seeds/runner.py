@@ -7,6 +7,7 @@ from sqlalchemy import Connection
 from app.core.config import SeedSettings
 from app.core.db.seeds.acuarius_app import seed_acuarius_application
 from app.core.db.seeds.admin import load_seed_config, seed_admin_user
+from app.core.db.seeds.document_types import seed_document_types
 from app.core.db.seeds.leo_app import (
     seed_leo_admin_role,
     seed_leo_application,
@@ -23,6 +24,7 @@ class SeedReport:
 
 def run_seeds(conn: Connection, settings: SeedSettings) -> SeedReport:
     config = load_seed_config(settings)  # SeedConfigError antes de escribir
+    seed_document_types(conn)  # antes del admin: su FK apunta al catalogo
     app_id = seed_leo_application(conn, config.frontend_url)
     role_id = seed_leo_admin_role(conn, app_id)
     seed_leo_provisioner_role(conn, app_id)

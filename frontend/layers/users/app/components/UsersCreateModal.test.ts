@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LeoApiError } from '#leo-client/lib/errors'
 import { ALL_USERS_TAGS, signInWith } from '../../../../tests/helpers/session'
 import { clearPasswordPolicyCache } from '../../../../app/composables/usePasswordPolicy'
+import { clearDocumentTypesCache } from '../../../../app/composables/useDocumentTypes'
 import UsersCreateModal from './UsersCreateModal.vue'
 
 enableAutoUnmount(afterEach)
@@ -12,10 +13,25 @@ const { api } = vi.hoisted(() => ({ api: vi.fn() }))
 mockNuxtImport('useLeoApi', () => () => api)
 
 const saved = { id: 'u9', username: 'ana.perez' }
+const TYPES = [
+  { code: 'CC', name: 'Cédula de ciudadanía', sort_order: 10, is_active: true },
+  { code: 'CE', name: 'Cédula de extranjería', sort_order: 20, is_active: true },
+  { code: 'OLD', name: 'Tipo antiguo', sort_order: 99, is_active: false }
+]
+
+/** El catálogo responde siempre; `/users` responde `outcome` (valor o error). */
+function respondUsers(outcome: unknown) {
+  api.mockImplementation(async (url: string, options: { query: { active: boolean } }) => {
+    if (url === '/document-types') return TYPES.filter(type => type.is_active === options.query.active)
+    if (outcome instanceof Error) throw outcome
+    return outcome
+  })
+}
 
 beforeEach(() => {
   api.mockReset()
   clearPasswordPolicyCache()
+  clearDocumentTypesCache()
   signInWith(ALL_USERS_TAGS)
 })
 afterEach(() => { document.body.innerHTML = '' })
@@ -58,11 +74,11 @@ describe('UsersCreateModal', () => {
     submit()
     await vi.waitFor(() => expect(document.body.textContent).toContain('sin puntos ni espacios'))
     expect(document.body.textContent).toContain('aún no cumple todos los requisitos')
-    expect(api.mock.calls.filter(call => call[0] !== '/auth/password-policy')).toEqual([])
+    expect(api.mock.calls.filter(call => !['/auth/password-policy', '/document-types'].includes(call[0]))).toEqual([])
   })
 
   it('el número de documento con letras se envía en mayúsculas y el usuario en minúsculas', async () => {
-    api.mockResolvedValue(saved)
+    respondUsers(saved)
     const wrapper = await mountSuspended(UsersCreateModal, { props: { open: true }, attachTo: document.body })
     await fill({ username: 'Ana.Perez', number: 'ab-12' })
     submit()
@@ -79,7 +95,7 @@ describe('UsersCreateModal', () => {
   })
 
   it('correo duplicado (409): mensaje legible en el campo del correo', async () => {
-    api.mockRejectedValue(new LeoApiError(409, 'duplicate', 'Ya existe un usuario con el email «ana@x.co».', { email: 'ana@x.co' }))
+    respondUsers(new LeoApiError(409, 'duplicate', 'Ya existe un usuario con el email «ana@x.co».', { email: 'ana@x.co' }))
     await mountSuspended(UsersCreateModal, { props: { open: true }, attachTo: document.body })
     await fill({ number: '1234' })
     submit()
@@ -87,15 +103,35 @@ describe('UsersCreateModal', () => {
   })
 
   it('documento duplicado (409): mensaje en el campo del documento', async () => {
-    api.mockRejectedValue(new LeoApiError(409, 'duplicate', 'Ya existe un usuario con el documento «CC 1234».', { document_number: 'CC 1234' }))
+    respondUsers(new LeoApiError(409, 'duplicate', 'Ya existe un usuario con el documento «CC 1234».', { document_number: 'CC 1234' }))
     await mountSuspended(UsersCreateModal, { props: { open: true }, attachTo: document.body })
     await fill({ number: '1234' })
     submit()
     await vi.waitFor(() => expect(document.body.textContent).toContain('Ya existe un usuario con el documento'))
   })
 
+  it('el selector ofrece solo los tipos activos del catálogo del servidor', async () => {
+    respondUsers(saved)
+    await mountSuspended(UsersCreateModal, { props: { open: true }, attachTo: document.body })
+    await vi.waitFor(() => expect(dialog().querySelectorAll('select option').length).toBeGreaterThan(1))
+    const labels = [...dialog().querySelectorAll('select option')].map(option => option.textContent?.trim())
+    expect(labels).toContain('CC · Cédula de ciudadanía')
+    expect(labels).toContain('CE · Cédula de extranjería')
+    expect(labels.join('|')).not.toContain('Tipo antiguo')
+  })
+
+  it('tipo de documento inválido (422 invalid_document_type): mensaje en el campo del tipo', async () => {
+    respondUsers(new LeoApiError(422, 'invalid_document_type', 'El tipo de documento «XX» no existe o está inactivo.', { document_type: 'XX' }))
+    await mountSuspended(UsersCreateModal, { props: { open: true }, attachTo: document.body })
+    await vi.waitFor(() => expect(dialog().querySelectorAll('select option').length).toBeGreaterThan(1))
+    await fill({ number: '1234' })
+    submit()
+    await vi.waitFor(() => expect(document.body.textContent).toContain('ya no está disponible'))
+    expect(document.body.textContent).not.toMatch(/invalid_document_type/)
+  })
+
   it('error de red: mensaje legible, no el crudo', async () => {
-    api.mockRejectedValue(new TypeError('Failed to fetch'))
+    respondUsers(new TypeError('Failed to fetch'))
     await mountSuspended(UsersCreateModal, { props: { open: true }, attachTo: document.body })
     await fill({ number: '1234' })
     submit()

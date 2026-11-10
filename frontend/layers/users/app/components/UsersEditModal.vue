@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useZodForm } from '#andromeda/composables/useZodForm'
 import type { UserRead } from '../types/users'
+import { isInvalidDocumentType, userErrorMessage } from '../utils/userErrors'
 import { userEditSchema } from '../utils/userSchemas'
 
 /**
@@ -26,9 +27,14 @@ const form = useZodForm(userEditSchema, {
 
 const onSubmit = form.submit(async (formValues) => {
   if (!props.user) return
-  const saved = await api.update(props.user.id, formValues)
-  emit('saved', saved)
-  open.value = false
+  try {
+    const saved = await api.update(props.user.id, formValues)
+    emit('saved', saved)
+    open.value = false
+  } catch (err) {
+    if (!isInvalidDocumentType(err)) throw err
+    form.setFieldError('document_type', userErrorMessage(err))
+  }
 })
 </script>
 
@@ -46,6 +52,6 @@ const onSubmit = form.submit(async (formValues) => {
       <div class="font-medium text-text-muted">Usuario</div>
       <div class="mt-1" data-testid="edit-username"><code>{{ user?.username }}</code> <span class="text-text-muted">(no se puede cambiar)</span></div>
     </div>
-    <UsersFormFields />
+    <UsersFormFields :current-document-type="user?.document_type" />
   </UiFormModal>
 </template>

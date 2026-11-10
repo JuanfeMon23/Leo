@@ -1,6 +1,7 @@
 """Interfaz publica del modulo `users` (usar `from app.modules import users`).
 
 - `users_router`: rutas `/api/v1/users`.
+- `document_types_router`: rutas `/api/v1/document-types` (catalogo).
 - `get_identity(session, user_id) -> UserIdentity | None`.
 - `check_credentials(session, login, password, ...) -> LoginCheck`: login
   (actualiza intentos, bloqueo y `last_login_at`; sin commit).
@@ -26,6 +27,7 @@ from app.modules.users.controller import (
     update_own_profile,
     verify_own_password,
 )
+from app.modules.users.document_types_router import router as document_types_router
 from app.modules.users.router import router as users_router
 from app.modules.users.schemas import ProfileUpdate
 
@@ -36,6 +38,7 @@ __all__ = [
     "UserIdentity",
     "change_own_password",
     "check_credentials",
+    "document_types_router",
     "get_identity",
     "is_email_change",
     "self_service_reason",

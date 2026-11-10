@@ -1,24 +1,12 @@
 import { z } from 'zod'
-import { zRequiredEnum, zRequiredText } from '#andromeda/utils/zodFields'
+import { zRequiredText } from '#andromeda/utils/zodFields'
 import { zEmail } from '../../../../app/utils/email'
-import { USERS_DOCUMENT_TYPES } from '../types/users'
 import type { PasswordPolicy } from '#andromeda/utils/passwordPolicy'
 import { zLazyPassword } from '../../../../app/utils/lazyPassword'
 
 // Mismos patrones que el backend (modules/users/models.py).
 export const USERS_USERNAME_REGEX = /^[a-z0-9]([a-z0-9._-]{1,62})[a-z0-9]$/
 export const USERS_DOCUMENT_NUMBER_REGEX = /^[0-9A-Z]+(-[0-9A-Z]+)*$/
-
-export const USERS_DOCUMENT_LABELS: Record<typeof USERS_DOCUMENT_TYPES[number], string> = {
-  CC: 'Cédula de ciudadanía',
-  CE: 'Cédula de extranjería',
-  TI: 'Tarjeta de identidad',
-  RC: 'Registro civil',
-  PA: 'Pasaporte',
-  NIT: 'NIT',
-  PEP: 'Permiso especial de permanencia',
-  PPT: 'Permiso por protección temporal'
-}
 
 const zUsername = z.preprocess(
   value => (typeof value === 'string' ? value.trim().toLowerCase() : value),
@@ -41,7 +29,7 @@ const zDocumentNumber = z.preprocess(
 
 const personFields = {
   email: zEmail,
-  document_type: zRequiredEnum(USERS_DOCUMENT_TYPES, 'Elige el tipo de documento.'),
+  document_type: zRequiredText('Elige el tipo de documento.'),
   document_number: zDocumentNumber,
   first_name: zRequiredText('Los nombres son obligatorios.', 100),
   last_name: zRequiredText('Los apellidos son obligatorios.', 100)

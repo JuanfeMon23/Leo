@@ -49,7 +49,7 @@ async def email_taken(
 
 async def document_taken(
     session: AsyncSession,
-    document_type: DocumentType,
+    document_type: str,
     number: str,
     exclude_id: UUID | None = None,
 ) -> bool:
@@ -73,3 +73,15 @@ async def remove_role(session: AsyncSession, user_id: UUID, role_id: UUID) -> bo
         delete(UserRole).where(UserRole.user_id == user_id, UserRole.role_id == role_id)
     )
     return result.rowcount > 0
+
+
+def document_types_statement(active: bool | None) -> Select:
+    """Catalogo de tipos de documento ordenado por `sort_order` y luego `code`."""
+    stmt = only_active(select(DocumentType), active, DocumentType.is_active)
+    return stmt.order_by(DocumentType.sort_order, DocumentType.code)
+
+
+async def document_type_by_code(
+    session: AsyncSession, code: str
+) -> DocumentType | None:
+    return await session.scalar(select(DocumentType).where(DocumentType.code == code))

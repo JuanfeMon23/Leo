@@ -218,6 +218,29 @@ async def test_settings_sin_delete_y_su_historial_solo_select_e_insert(
         assert await _sqlstate(roles_db, "leo_app", sql) == INSUFFICIENT_PRIVILEGE, sql
 
 
+async def test_document_types_sin_delete_para_leo_app(roles_db) -> None:
+    """Catalogo nuevo: grants por el script (SELECT/INSERT/UPDATE, sin DELETE)."""
+    await roles_db.execute("SET ROLE leo_app")
+    try:
+        assert await roles_db.fetchval(
+            "SELECT count(*) FROM document_types WHERE code = 'CC'"
+        )
+        await roles_db.execute(
+            "INSERT INTO document_types (code, name) VALUES ('ROLTST', 'Prueba')"
+        )
+        await roles_db.execute(
+            "UPDATE document_types SET is_active = false WHERE code = 'ROLTST'"
+        )
+    finally:
+        await roles_db.execute("RESET ROLE")
+    for sql in (
+        "DELETE FROM document_types",
+        "TRUNCATE document_types",
+        "DROP TABLE document_types",
+    ):
+        assert await _sqlstate(roles_db, "leo_app", sql) == INSUFFICIENT_PRIVILEGE, sql
+
+
 @pytest.mark.parametrize(
     "sql",
     [

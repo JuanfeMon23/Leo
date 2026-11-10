@@ -8,6 +8,7 @@ from .conftest import ExpectError, make_app, make_role, make_user, unique
 
 UNIQUE_VIOLATION = "23505"
 CHECK_VIOLATION = "23514"
+FK_VIOLATION = "23503"
 
 INSERT_USER = (
     "INSERT INTO users (username, email, password_hash, document_type, "
@@ -63,7 +64,6 @@ async def test_documento_es_unico_por_tipo(
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("document_type", "XX"),
         ("document_number", "12.345"),
         ("document_number", "abc123"),
         ("username", "Ana"),
@@ -79,6 +79,19 @@ async def test_users_rechaza_valores_invalidos(
     expect_error: ExpectError, field: str, value: str
 ) -> None:
     assert await expect_error(INSERT_USER, _user(**{field: value})) == CHECK_VIOLATION
+
+
+async def test_tipo_de_documento_desconocido_viola_la_fk(
+    expect_error: ExpectError,
+) -> None:
+    error = await expect_error(INSERT_USER, _user(document_type="XX"))
+    assert error == FK_VIOLATION
+
+
+async def test_tipo_de_documento_inexistente_viola_la_fk(
+    expect_error: ExpectError,
+) -> None:
+    assert await expect_error(INSERT_USER, _user(document_type="XX")) == "23503"
 
 
 async def test_intentos_fallidos_no_pueden_ser_negativos(

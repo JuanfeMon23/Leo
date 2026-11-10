@@ -31,6 +31,20 @@ LEO_SERVICE_GRANTABLE_ROLE_SLUGS = frozenset(
     {LEO_PROVISIONER_ROLE_SLUG, LEO_DELEGATE_ROLE_SLUG}
 )
 
+# Tipos de documento (catalogo en BD; Leo es su dueno unico). Mismos codigos
+# que usa `users.document_type`: (codigo, nombre visible, sort_order). La
+# migracion 0009 copia estos valores (una migracion es inmutable).
+DOCUMENT_TYPES: tuple[tuple[str, str, int], ...] = (
+    ("CC", "Cédula de ciudadanía", 10),
+    ("CE", "Cédula de extranjería", 20),
+    ("TI", "Tarjeta de identidad", 30),
+    ("RC", "Registro civil", 40),
+    ("PA", "Pasaporte", 50),
+    ("NIT", "NIT", 60),
+    ("PEP", "Permiso especial de permanencia", 70),
+    ("PPT", "Permiso por protección temporal", 80),
+)
+
 # slug del modulo -> (nombre, {verbo: descripcion})
 LEO_MODULES: dict[str, tuple[str, dict[str, str]]] = {
     "applications": (
@@ -62,6 +76,14 @@ LEO_MODULES: dict[str, tuple[str, dict[str, str]]] = {
             "delegated-self-manage": "Editar el perfil y cambiar la contrasena de "
             "un usuario sin permisos de Leo en nombre suyo, desde una aplicacion "
             "con credencial de servicio y el token de acceso del usuario",
+        },
+    ),
+    "document-types": (
+        "Tipos de documento",
+        {
+            "create": "Crear tipos de documento",
+            "edit": "Editar el nombre y el orden de los tipos de documento",
+            "deactivate": "Desactivar o reactivar tipos de documento",
         },
     ),
     "roles": (
@@ -129,6 +151,9 @@ LEO_ACTION_NAMES: dict[str, str] = {
     "leo.users.assign-roles": "Asignar roles a usuarios",
     "leo.users.provision-patient": "Aprovisionar pacientes",
     "leo.users.delegated-self-manage": "Delegar la autogestión de usuarios",
+    "leo.document-types.create": "Crear tipos de documento",
+    "leo.document-types.edit": "Editar tipos de documento",
+    "leo.document-types.deactivate": "Desactivar y reactivar tipos de documento",
     "leo.roles.view": "Consultar roles",
     "leo.roles.create": "Crear roles",
     "leo.roles.edit": "Editar roles",

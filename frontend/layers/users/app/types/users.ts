@@ -1,8 +1,8 @@
 // Tipos del contrato `/api/v1/users` (fuente: backend/app/modules/users/schemas.py)
 // y de lo que el módulo lee de `/roles` y `/applications` (selector de roles por aplicación).
 
-export const USERS_DOCUMENT_TYPES = ['CC', 'CE', 'TI', 'RC', 'PA', 'NIT', 'PEP', 'PPT'] as const
-export type UsersDocumentType = typeof USERS_DOCUMENT_TYPES[number]
+/** Código de un tipo de documento: el catálogo vive en la BD (`GET /document-types`). */
+export type UsersDocumentType = string
 
 export interface UserRead {
   id: string

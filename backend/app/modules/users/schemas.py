@@ -9,10 +9,10 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstr
 from app.core.security.passwords import MAX_PASSWORD_LENGTH
 from app.core.validators import UpdateModel, text
 from app.modules.users.models import (
+    CATALOG_CODE_PATTERN,
     DOCUMENT_NUMBER_PATTERN,
     EMAIL_PATTERN,
     USERNAME_PATTERN,
-    DocumentType,
 )
 
 
@@ -45,6 +45,15 @@ DocumentNumber = Annotated[
     StringConstraints(min_length=1, max_length=32, pattern=DOCUMENT_NUMBER_PATTERN),
     Field(description="Dígitos/letras y guiones internos, sin puntos ni espacios."),
 ]
+DocumentTypeCode = Annotated[
+    str,
+    BeforeValidator(_upper),
+    StringConstraints(min_length=1, max_length=8),
+    Field(
+        description="Código de un tipo de documento activo del catálogo "
+        "(`GET /api/v1/document-types`); si no existe o está inactivo, 422."
+    ),
+]
 PersonName = text(100)
 Password = Annotated[
     str, StringConstraints(min_length=1, max_length=MAX_PASSWORD_LENGTH)
@@ -60,7 +69,7 @@ class UserCreate(BaseModel):
         description="12-128 caracteres, con minúscula, mayúscula, dígito y símbolo; "
         "sin contener el usuario ni el email."
     )
-    document_type: DocumentType
+    document_type: DocumentTypeCode
     document_number: DocumentNumber
     first_name: PersonName
     last_name: PersonName
@@ -77,7 +86,7 @@ class UserUpdate(UpdateModel):
     )
 
     email: Email | None = None
-    document_type: DocumentType | None = None
+    document_type: DocumentTypeCode | None = None
     document_number: DocumentNumber | None = None
     first_name: PersonName | None = None
     last_name: PersonName | None = None
@@ -115,7 +124,7 @@ class UserRead(BaseModel):
     id: UUID
     username: str
     email: str
-    document_type: DocumentType
+    document_type: DocumentTypeCode
     document_number: str
     first_name: str
     last_name: str
@@ -158,7 +167,7 @@ class PatientRead(BaseModel):
     id: UUID
     username: str
     email: str
-    document_type: DocumentType
+    document_type: DocumentTypeCode
     document_number: str
     first_name: str
     last_name: str
@@ -204,3 +213,38 @@ class DelegatedProfileRead(BaseModel):
     last_name: str
     email: str
     username: str
+
+
+class DocumentTypeRead(BaseModel):
+    """Tipo de documento del catálogo (Leo es su dueño único)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    code: str
+    name: str
+    sort_order: int
+    is_active: bool
+
+
+class DocumentTypeCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: Annotated[
+        str,
+        BeforeValidator(_upper),
+        StringConstraints(min_length=1, max_length=8, pattern=CATALOG_CODE_PATTERN),
+        Field(
+            description="Clave estable: mayúsculas y dígitos, empieza por letra "
+            "(máx. 8). No se puede cambiar."
+        ),
+    ]
+    name: text(100)
+    sort_order: int = Field(default=0, ge=0, le=32767)
+
+
+class DocumentTypeUpdate(UpdateModel):
+    immutable_fields = ("code", "is_active")
+    non_nullable_fields = ("name", "sort_order")
+
+    name: text(100) | None = None
+    sort_order: int | None = Field(default=None, ge=0, le=32767)

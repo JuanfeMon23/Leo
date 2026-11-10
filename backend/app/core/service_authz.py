@@ -12,6 +12,10 @@ on_denied=...)`.
 - Un Bearer ausente, desconocido, vencido o revocado: 401 `invalid_token`
   con `WWW-Authenticate: Bearer`. Nunca se cae a la cookie de sesion.
 - Falta el permiso: 403 `forbidden` y evento de auditoria `denied`.
+- `UserOrService`: para lecturas abiertas a cualquier autenticado: con
+  `Authorization: Bearer` exige un token de servicio valido de audiencia `leo`
+  (con algun acceso concedido, sin tag concreto); sin Bearer exige la sesion
+  SSO del usuario (cookie + DPoP).
 - Solo se aceptan permisos registrados en el catalogo de Leo, no de evento.
 """
 
@@ -24,7 +28,7 @@ from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import Actor
-from app.core.authz import _check_permission_tag
+from app.core.authz import Principal, _check_permission_tag, current_principal
 from app.core.database import SessionDep
 from app.core.exceptions import ForbiddenError, UnauthorizedError
 from app.core.request_meta import RequestMeta, request_meta
@@ -111,3 +115,19 @@ def require_service_actor(tag: str):
 
 
 ServiceCaller = tuple[ServicePrincipal, Actor]
+
+
+async def user_or_service(
+    request: Request, session: SessionDep
+) -> Principal | ServicePrincipal:
+    if request.headers.get("authorization", "").lower().startswith("bearer"):
+        if _config.resolver is None:
+            raise RuntimeError("configure_service_authz() no fue llamado al arrancar")
+        principal = await _config.resolver(session, _bearer(request))
+        if principal is None:
+            raise invalid_token()
+        return principal
+    return await current_principal(request, session)
+
+
+UserOrService = Annotated[Principal | ServicePrincipal, Depends(user_or_service)]

@@ -55,6 +55,7 @@ def create_app() -> FastAPI:
     app.include_router(applications.applications_router, prefix=f"{API}/applications")
     app.include_router(roles.service_access_router, prefix=f"{API}/applications")
     app.include_router(users.users_router, prefix=f"{API}/users")
+    app.include_router(users.document_types_router, prefix=f"{API}/document-types")
     app.include_router(roles.roles_router, prefix=f"{API}/roles")
     app.include_router(audit.audit_router, prefix=f"{API}/audit")
     app.include_router(settings.settings_router, prefix=f"{API}/settings")

@@ -1,6 +1,5 @@
 """Tablas del modulo `users`: identidades del ecosistema y sus roles."""
 
-import enum
 import uuid
 from datetime import datetime
 
@@ -22,21 +21,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.db.base import Base
 from app.core.db.checks import not_blank_check
 from app.core.db.mixins import ActivatableMixin, Timestamps, UUIDv7PK
-from app.core.db.types import str_enum
-
-
-class DocumentType(enum.StrEnum):
-    """Tipos de documento de identidad (Colombia)."""
-
-    CC = "CC"  # cedula de ciudadania
-    CE = "CE"  # cedula de extranjeria
-    TI = "TI"  # tarjeta de identidad
-    RC = "RC"  # registro civil
-    PA = "PA"  # pasaporte
-    NIT = "NIT"
-    PEP = "PEP"  # permiso especial de permanencia
-    PPT = "PPT"  # permiso por proteccion temporal
-
 
 # Usuario en minusculas (3-64): letras, digitos y `._-` internos. Sin `@`,
 # asi el login por "usuario o email" nunca es ambiguo.
@@ -45,6 +29,30 @@ USERNAME_PATTERN = r"^[a-z0-9]([a-z0-9._-]{1,62})[a-z0-9]$"
 EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+$"
 # Numero de documento normalizado: mayusculas/digitos, guiones internos.
 DOCUMENT_NUMBER_PATTERN = r"^[0-9A-Z]+(-[0-9A-Z]+)*$"
+
+
+# Codigo de un catalogo: mayusculas y digitos, empieza por letra.
+CATALOG_CODE_PATTERN = r"^[A-Z][A-Z0-9]*$"
+
+
+class DocumentType(UUIDv7PK, Timestamps, ActivatableMixin, Base):
+    """Catalogo de tipos de documento. Leo es su dueno unico: Acuarius e
+    Incubus lo consumen por la API de Leo, no lo copian. `code` es la clave
+    estable que referencia `users.document_type`; se desactiva (`is_active`),
+    no se borra. La semilla inicial vive en `core/db/seeds/catalog.py`."""
+
+    __tablename__ = "document_types"
+    __table_args__ = (
+        CheckConstraint(f"code ~ '{CATALOG_CODE_PATTERN}'", name="code_format"),
+        CheckConstraint("sort_order >= 0", name="sort_order_non_negative"),
+        not_blank_check("name"),
+    )
+
+    code: Mapped[str] = mapped_column(String(8), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    sort_order: Mapped[int] = mapped_column(
+        Integer, server_default=text("0"), nullable=False
+    )
 
 
 class User(UUIDv7PK, Timestamps, ActivatableMixin, Base):
@@ -75,9 +83,9 @@ class User(UUIDv7PK, Timestamps, ActivatableMixin, Base):
     email: Mapped[str] = mapped_column(String(254), nullable=False)
     # Hash argon2id completo (PHC: algoritmo, parametros y sal).
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
-    document_type: Mapped[DocumentType] = mapped_column(
-        str_enum(DocumentType, "document_type", 8),
-        nullable=False,
+    # FK al `code` del catalogo (el backend valida que exista y este activo).
+    document_type: Mapped[str] = mapped_column(
+        String(8), ForeignKey("document_types.code"), nullable=False
     )
     document_number: Mapped[str] = mapped_column(String(32), nullable=False)
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)

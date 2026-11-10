@@ -42,9 +42,11 @@ describe('userCreateSchema', () => {
     expect(issues({ ...valid, email: '' }).email).toBeTruthy()
   })
 
-  it('documento: tipo de la lista y número sin puntos ni espacios', () => {
+  it('documento: tipo obligatorio (el catálogo lo valida el backend) y número sin puntos ni espacios', () => {
     expect(issues({ ...valid, document_type: '' }).document_type).toBeTruthy()
-    expect(issues({ ...valid, document_type: 'XX' }).document_type).toBeTruthy()
+    expect(issues({ ...valid, document_type: '  ' }).document_type).toBeTruthy()
+    expect(issues({ ...valid, document_type: 'XX' }).document_type).toBeUndefined()
+    expect(userCreate.parse({ ...valid, document_type: ' PEP ' }).document_type).toBe('PEP')
     expect(issues({ ...valid, document_number: '1.234.567' }).document_number).toMatch(/puntos/)
     expect(issues({ ...valid, document_number: '12 34' }).document_number).toBeTruthy()
     expect(issues({ ...valid, document_number: '' }).document_number).toBeTruthy()

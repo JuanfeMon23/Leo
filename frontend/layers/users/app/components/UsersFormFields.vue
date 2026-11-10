@@ -1,16 +1,13 @@
 <script setup lang="ts">
-import { toSelectOptions } from '#andromeda/utils/zodFields'
-import { USERS_DOCUMENT_TYPES } from '../types/users'
-import { USERS_DOCUMENT_LABELS } from '../utils/userSchemas'
-
 /**
  * Campos de persona (nombres, correo, documento) que comparten crear y editar.
  * Se montan dentro de un `useZodForm` del ancestro (los `UiFormField name`
- * se enlazan solos).
+ * se enlazan solos). Los tipos de documento salen del catálogo del servidor;
+ * al editar se pasa el tipo actual para que siga ofrecido aunque esté inactivo.
  */
-const documentOptions = toSelectOptions(
-  Object.fromEntries(USERS_DOCUMENT_TYPES.map(documentType => [documentType, `${documentType} · ${USERS_DOCUMENT_LABELS[documentType]}`])) as Record<string, string>
-)
+const props = defineProps<{ currentDocumentType?: string | null }>()
+const documentTypes = useDocumentTypes()
+const documentOptions = computed(() => documentTypes.selectOptions(props.currentDocumentType))
 </script>
 
 <template>

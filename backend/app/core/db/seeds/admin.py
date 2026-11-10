@@ -13,12 +13,12 @@ from sqlalchemy import Connection, select
 from sqlalchemy.dialects.postgresql import insert
 
 from app.core.config import SeedSettings
+from app.core.db.seeds.catalog import DOCUMENT_TYPES
 from app.core.security.passwords import hash_password, password_weaknesses
 from app.modules.users.models import (
     DOCUMENT_NUMBER_PATTERN,
     EMAIL_PATTERN,
     USERNAME_PATTERN,
-    DocumentType,
     User,
     UserRole,
 )
@@ -47,7 +47,7 @@ class SeedConfig:
     username: str
     email: str
     password: str
-    document_type: DocumentType
+    document_type: str
     document_number: str
     first_name: str
     last_name: str
@@ -86,10 +86,10 @@ def load_seed_config(settings: SeedSettings) -> SeedConfig:
     if not re.match(EMAIL_PATTERN, email):
         errors.append("LEO_ADMIN_EMAIL no es un email valido.")
     document_type = values["admin_document_type"].upper()
-    if document_type not in {member.value for member in DocumentType}:
+    codes = [code for code, _name, _order in DOCUMENT_TYPES]
+    if document_type not in codes:
         errors.append(
-            "LEO_ADMIN_DOCUMENT_TYPE no es valido; usa uno de: "
-            f"{', '.join(member.value for member in DocumentType)}."
+            f"LEO_ADMIN_DOCUMENT_TYPE no es valido; usa uno de: {', '.join(codes)}."
         )
     document_number = values["admin_document_number"].upper()
     if not re.match(DOCUMENT_NUMBER_PATTERN, document_number):
@@ -109,7 +109,7 @@ def load_seed_config(settings: SeedSettings) -> SeedConfig:
         username=username,
         email=email,
         password=password,
-        document_type=DocumentType(document_type),
+        document_type=document_type,
         document_number=document_number,
         first_name=_value(settings, "admin_first_name") or DEFAULT_FIRST_NAME,
         last_name=_value(settings, "admin_last_name") or DEFAULT_LAST_NAME,
@@ -131,7 +131,7 @@ def seed_admin_user(conn: Connection, config: SeedConfig, role_id: UUID) -> bool
                 username=config.username,
                 email=config.email,
                 password_hash=hash_password(config.password),
-                document_type=config.document_type.value,
+                document_type=config.document_type,
                 document_number=config.document_number,
                 first_name=config.first_name,
                 last_name=config.last_name,

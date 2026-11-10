@@ -47,4 +47,3 @@ def b64url_sha256_check(column: str) -> CheckConstraint:
 
 def not_blank_check(column: str) -> CheckConstraint:
     return CheckConstraint(f"btrim({column}) <> ''", name=f"{column}_not_blank")
-

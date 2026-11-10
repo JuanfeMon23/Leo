@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useZodForm } from '#andromeda/composables/useZodForm'
 import type { UserRead } from '../types/users'
+import { isInvalidDocumentType, userErrorMessage } from '../utils/userErrors'
 import { userCreateSchema } from '../utils/userSchemas'
 
 /**
@@ -25,9 +26,15 @@ watch(open, (isOpen) => { if (!isOpen) form.reset() })
 const values = form.values as { password?: string }
 
 const onSubmit = form.submit(async (formValues) => {
-  const saved = await api.create(formValues)
-  emit('saved', saved)
-  open.value = false
+  try {
+    const saved = await api.create(formValues)
+    emit('saved', saved)
+    open.value = false
+  } catch (err) {
+    // Tipo de documento inválido: se marca en su campo; el resto lo reparte `useZodForm`.
+    if (!isInvalidDocumentType(err)) throw err
+    form.setFieldError('document_type', userErrorMessage(err))
+  }
 })
 </script>
 

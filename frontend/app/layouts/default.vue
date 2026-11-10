@@ -8,6 +8,11 @@ const canViewRoles = useCan('leo.roles.view')
 const canViewAudit = useCan('leo.audit.view')
 const canViewSessions = useCan('leo.auth.view')
 const canViewSettings = useCan('leo.settings.view')
+// Sin tag `view`: basta cualquiera de las acciones de gestión del catálogo.
+const canManageDocumentTypes = useCan(
+  ['leo.document-types.create', 'leo.document-types.edit', 'leo.document-types.deactivate'],
+  'any'
+)
 const menu = computed<UiSidebarItem[]>(() => [
   ...(canViewApplications.value
     ? [{
@@ -31,6 +36,14 @@ const menu = computed<UiSidebarItem[]>(() => [
         to: '/roles',
         // Escudo (trazo, 24×24).
         icon: 'M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z'
+      }]
+    : []),
+  ...(canManageDocumentTypes.value
+    ? [{
+        label: 'Tipos de documento',
+        to: '/document-types',
+        // Tarjeta de identificación (trazo, 24×24).
+        icon: 'M3 6h18v12H3zM7 10h4M7 14h6M16 10h2v4h-2z'
       }]
     : []),
   ...(canViewSessions.value

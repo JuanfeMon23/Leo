@@ -2,7 +2,6 @@
 import type { UserRead, UserRoleRead } from '../types/users'
 import { userErrorMessage } from '../utils/userErrors'
 import { usersDocument, usersFormatDateTime, usersFullName, usersIsLocked } from '../utils/userDisplay'
-import { USERS_DOCUMENT_LABELS } from '../utils/userSchemas'
 
 /**
  * Detalle de un usuario: datos, estado, acceso por aplicación, roles
@@ -14,6 +13,7 @@ import { USERS_DOCUMENT_LABELS } from '../utils/userSchemas'
 const props = defineProps<{ id: string }>()
 
 const api = useUsersApi()
+const documentTypes = useDocumentTypes()
 const toast = useToast()
 const me = useLeoUser()
 
@@ -95,7 +95,7 @@ const deactivating = computed(() => toggle.target?.is_active ?? true)
           </div>
           <div>
             <dt class="font-medium text-text-muted">Documento</dt>
-            <dd class="mt-1">{{ usersDocument(user) }} <span class="text-text-muted">({{ USERS_DOCUMENT_LABELS[user.document_type] }})</span></dd>
+            <dd class="mt-1">{{ usersDocument(user) }} <span class="text-text-muted">({{ documentTypes.nameOf(user.document_type) }})</span></dd>
           </div>
           <div>
             <dt class="font-medium text-text-muted">Último acceso</dt>

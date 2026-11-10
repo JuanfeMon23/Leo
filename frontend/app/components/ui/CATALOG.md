@@ -14,5 +14,6 @@
 | `UiPasswordInput` | `#andromeda/components/ui/UiPasswordInput.vue` (capa Andromeda; su test sigue en `app/components/ui/UiPasswordInput.test.ts`) | Campo de contraseña con mostrar/ocultar; mismos props que `UiTextInput`, sin `type` | `auth` (login), `users` (crear, restablecer), `profile` |
 | `zEmail`, `EMAIL_REGEX` | `frontend/app/utils/email.ts` | `zEmail` — correo obligatorio, recortado, máx. 254, forma `a@b` | `users`, `profile` |
 | `formatWait` | `frontend/app/utils/formatWait.ts` | `(seconds): string` — «45 segundos», «2 minutos», «1 hora» | `auth` (429 del login), `profile` (429 de contraseña) |
+| `useDocumentTypes`, `clearDocumentTypesCache` | `frontend/app/composables/useDocumentTypes.ts` (+ tipo `DocumentTypeRead` en `app/types/documentTypes.ts`) | `useDocumentTypes(): { types, loading, error, load(force?), nameOf(code), selectOptions(current?) }` — catálogo de tipos de documento (`GET /document-types`, caché ~30 s); `selectOptions` ofrece activos más el código actual aunque esté inactivo; `clearDocumentTypesCache()` tras gestionar el catálogo | `users` (formularios y detalle), `document-types` (invalida la caché) |
 
 _Las utilidades de `app/utils/` se auto-importan en componentes; en pruebas de entorno `node` y en utils puras se importan por ruta relativa explícita. `auth` solo usa Andromeda y `leo-client`._

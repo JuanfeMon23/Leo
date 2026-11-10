@@ -3,6 +3,7 @@ import { enableAutoUnmount, flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LeoApiError } from '#leo-client/lib/errors'
 import { ALL_USERS_TAGS, signInWith } from '../../../../tests/helpers/session'
+import { clearDocumentTypesCache } from '../../../../app/composables/useDocumentTypes'
 import UsersDetail from './UsersDetail.vue'
 
 enableAutoUnmount(afterEach)
@@ -29,9 +30,9 @@ const detail = (over: Record<string, unknown> = {}, roles: unknown[] = [{ id: 'r
 
 /** Enruta las llamadas de la API por método y ruta. */
 function route(handlers: Record<string, unknown>) {
-  api.mockImplementation(async (url: string, opts: { method?: string } = {}) => {
+  api.mockImplementation(async (url: string, opts: { method?: string, query?: { active?: boolean } } = {}) => {
     const key = `${opts.method ?? 'GET'} ${url}`
-    const handler = handlers[key]
+    const handler = key === 'GET /document-types' && opts.query?.active === false ? [] : handlers[key]
     if (handler === undefined) throw new Error(`sin handler: ${key}`)
     if (handler instanceof Error) throw handler
     return handler
@@ -39,6 +40,7 @@ function route(handlers: Record<string, unknown>) {
 }
 const base = (over: Record<string, unknown> = {}) => ({
   'GET /users/u2': detail(),
+  'GET /document-types': [{ code: 'CC', name: 'Cédula de ciudadanía', sort_order: 10, is_active: true }],
   'GET /applications': apps,
   'GET /roles': allRoles,
   'GET /roles/r1': roleWithActions,
@@ -49,6 +51,7 @@ const byId = (id: string) => document.body.querySelector<HTMLElement>(`[data-tes
 
 beforeEach(() => {
   api.mockReset()
+  clearDocumentTypesCache()
   signInWith(ALL_USERS_TAGS)
 })
 afterEach(() => { document.body.innerHTML = '' })
@@ -61,6 +64,15 @@ async function mountDetail(handlers: Record<string, unknown> = {}, id = 'u2') {
 }
 
 describe('UsersDetail', () => {
+  it('nombra el tipo de documento con el catálogo del servidor y cae al código si no está', async () => {
+    const wrapper = await mountDetail()
+    expect(wrapper.text()).toContain('CC 99 (Cédula de ciudadanía)')
+    wrapper.unmount()
+    clearDocumentTypesCache()
+    const other = await mountDetail({ 'GET /users/u2': detail({ document_type: 'ZZ' }) })
+    expect(other.text()).toContain('ZZ 99 (ZZ)')
+  })
+
   it('muestra datos, roles agrupados por aplicación y la línea «Acceso a»', async () => {
     const wrapper = await mountDetail({ 'GET /users/u2': detail({}, [
       { id: 'r1', application_id: 'a-leo', slug: 'adm', name: 'Administrador', is_active: true },
